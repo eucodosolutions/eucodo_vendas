@@ -6,6 +6,7 @@ import { criarPedido, type EstadoVenda } from "./actions";
 import { useAviso } from "@/components/ui/avisos";
 import { Botao } from "@/components/ui/botao";
 import { Campo } from "@/components/ui/campo";
+import { CampoWhatsapp } from "@/components/ui/campo-whatsapp";
 import { Secao } from "@/components/ui/secao";
 import { moeda, ROTULO_COR, ROTULO_TECNOLOGIA } from "@/lib/formato";
 import type { CorArte, TecnologiaArte } from "@/types/database";
@@ -138,13 +139,7 @@ export function VendaRapida({ tamanhos }: { tamanhos: TamanhoComVariantes[] }) {
               ajuda="E este nome que vai impresso no display, no lugar do logo do Google."
             />
 
-            <Campo
-              rotulo="WhatsApp do cliente"
-              name="whatsapp"
-              required
-              inputMode="tel"
-              placeholder="(85) 9 8707-3847"
-            />
+            <CampoWhatsapp rotulo="WhatsApp do cliente" required />
 
             <Campo
               rotulo="Link de avaliacao do Google"

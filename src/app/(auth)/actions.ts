@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { normalizarWhatsapp } from "@/lib/formato";
 import { createClient } from "@/lib/supabase/server";
 
 export type EstadoFormulario = {
@@ -21,6 +22,7 @@ const esquemaEntrada = z.object({
 const esquemaCadastro = z.object({
   nome: z.string().trim().min(2, "Digite seu nome."),
   email,
+  whatsapp: z.string().trim().min(1, "Digite seu WhatsApp."),
   senha,
 });
 
@@ -96,15 +98,21 @@ export async function criarConta(
   const resultado = esquemaCadastro.safeParse({
     nome: dados.get("nome"),
     email: dados.get("email"),
+    whatsapp: dados.get("whatsapp"),
     senha: dados.get("senha"),
   });
   if (!resultado.success) return { erro: primeiroErro(resultado) };
+
+  const whatsapp = normalizarWhatsapp(resultado.data.whatsapp);
+  if (!whatsapp) {
+    return { erro: "Esse WhatsApp nao parece valido. Confira o DDD e o numero." };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signUp({
     email: resultado.data.email,
     password: resultado.data.senha,
-    options: { data: { nome: resultado.data.nome } },
+    options: { data: { nome: resultado.data.nome, whatsapp } },
   });
 
   if (error) {

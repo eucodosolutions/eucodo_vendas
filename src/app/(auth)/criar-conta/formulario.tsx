@@ -7,6 +7,7 @@ import { criarConta, type EstadoFormulario } from "../actions";
 import { useAviso } from "@/components/ui/avisos";
 import { Botao } from "@/components/ui/botao";
 import { Campo } from "@/components/ui/campo";
+import { CampoWhatsapp } from "@/components/ui/campo-whatsapp";
 
 export function FormularioCriarConta() {
   const [estado, acao] = useActionState<EstadoFormulario, FormData>(criarConta, {});
@@ -38,6 +39,7 @@ export function FormularioCriarConta() {
         inputMode="email"
         required
       />
+      <CampoWhatsapp required />
       <Campo
         rotulo="Senha"
         name="senha"

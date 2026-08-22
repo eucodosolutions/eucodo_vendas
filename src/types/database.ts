@@ -26,6 +26,7 @@ export type Perfil = {
   id: string;
   nome: string;
   email: string;
+  whatsapp: string | null;
   papel: PapelUsuario;
   status: StatusUsuario;
   criado_em: string;

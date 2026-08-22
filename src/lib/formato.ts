@@ -14,10 +14,41 @@ export function data(iso: string): string {
   return DATA.format(new Date(iso));
 }
 
+/** Mascara padrao do sistema para WhatsApp: (00) 0 0000-0000. */
+export const MASCARA_WHATSAPP = "(00) 0 0000-0000";
+export const TAMANHO_MASCARA_WHATSAPP = MASCARA_WHATSAPP.length;
+
+/**
+ * Aplica a mascara enquanto a pessoa digita, aceitando texto colado com ou sem
+ * formatacao. Descarta o 55 quando alguem cola o numero em formato
+ * internacional, senao o DDD sairia errado.
+ */
+export function formatarMascaraWhatsapp(bruto: string): string {
+  let digitos = bruto.replace(/\D/g, "");
+
+  // O zero da operadora e o 55 do formato internacional atrapalham o DDD.
+  if (digitos.startsWith("0")) digitos = digitos.slice(1);
+  if (digitos.length > 11 && digitos.startsWith("55")) digitos = digitos.slice(2);
+  digitos = digitos.slice(0, 11);
+
+  const ddd = digitos.slice(0, 2);
+  const nono = digitos.slice(2, 3);
+  const meio = digitos.slice(3, 7);
+  const fim = digitos.slice(7, 11);
+
+  if (digitos.length <= 2) return digitos.length ? `(${ddd}` : "";
+  if (digitos.length === 3) return `(${ddd}) ${nono}`;
+  if (digitos.length <= 7) return `(${ddd}) ${nono} ${meio}`;
+  return `(${ddd}) ${nono} ${meio}-${fim}`;
+}
+
 /**
  * Deixa o numero no formato que a uazapi espera: so digitos, com 55 na frente.
  * Aceita o que a pessoa digitar, inclusive com mascara e com o zero da
  * operadora, e devolve null quando nao da para salvar.
+ *
+ * Exige celular: DDD valido e o nono digito. Numero fixo nao entra, porque o
+ * destino de tudo que o sistema manda e uma conversa de WhatsApp.
  */
 export function normalizarWhatsapp(bruto: string): string | null {
   let digitos = bruto.replace(/\D/g, "");
@@ -25,8 +56,8 @@ export function normalizarWhatsapp(bruto: string): string | null {
   if (digitos.startsWith("0")) digitos = digitos.slice(1);
   if (!digitos.startsWith("55")) digitos = `55${digitos}`;
 
-  // 55 + DDD + 8 ou 9 digitos.
-  return /^55[1-9][0-9]{9,10}$/.test(digitos) ? digitos : null;
+  // 55 + DDD (11 a 99) + 9 + 8 digitos.
+  return /^55[1-9][0-9]9[0-9]{8}$/.test(digitos) ? digitos : null;
 }
 
 /** Escreve o numero de volta no jeito que o Joel le: (85) 9 8707-3847. */
