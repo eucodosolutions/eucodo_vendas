@@ -9,7 +9,7 @@ export default function PaginaRedefinirSenha() {
     <>
       <h1 className="text-xl font-semibold tracking-tight text-tinta">Criar nova senha</h1>
       <p className="mt-1 mb-6 text-sm text-tinta-suave">
-        Escolha uma senha nova. Ela passa a valer no proximo acesso.
+        Escolha uma senha nova. Ela passa a valer no próximo acesso.
       </p>
       <FormularioRedefinirSenha />
     </>

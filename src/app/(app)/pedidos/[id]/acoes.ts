@@ -54,10 +54,10 @@ export async function mudarStatus(_estado: EstadoAcao, dados: FormData): Promise
     pedidoId: dados.get("pedidoId"),
     status: dados.get("status"),
   });
-  if (!resultado.success) return { erro: "Status invalido." };
+  if (!resultado.success) return { erro: "Status inválido." };
 
   const { supabase, user } = await sessao();
-  if (!user) return { erro: "Sessao expirada. Entre de novo." };
+  if (!user) return { erro: "Sessão expirada. Entre de novo." };
 
   const { data: pedido } = await supabase
     .from("pedidos")
@@ -65,9 +65,9 @@ export async function mudarStatus(_estado: EstadoAcao, dados: FormData): Promise
     .eq("id", resultado.data.pedidoId)
     .single();
 
-  if (!pedido) return { erro: "Pedido nao encontrado." };
+  if (!pedido) return { erro: "Pedido não encontrado." };
   if (pedido.status === "cancelado") {
-    return { erro: "Pedido cancelado nao muda de status." };
+    return { erro: "Pedido cancelado não muda de status." };
   }
 
   const { error } = await supabase
@@ -75,7 +75,7 @@ export async function mudarStatus(_estado: EstadoAcao, dados: FormData): Promise
     .update({ status: resultado.data.status })
     .eq("id", resultado.data.pedidoId);
 
-  if (error) return { erro: "Nao consegui mudar o status." };
+  if (error) return { erro: "Não consegui mudar o status." };
 
   await registrarEvento({
     supabase,
@@ -106,7 +106,7 @@ export async function marcarPago(_estado: EstadoAcao, dados: FormData): Promise<
   if (!resultado.success) return { erro: "Escolha a forma de pagamento." };
 
   const { supabase, user } = await sessao();
-  if (!user) return { erro: "Sessao expirada. Entre de novo." };
+  if (!user) return { erro: "Sessão expirada. Entre de novo." };
 
   const { error } = await supabase
     .from("pedidos")
@@ -118,7 +118,7 @@ export async function marcarPago(_estado: EstadoAcao, dados: FormData): Promise<
     .eq("id", resultado.data.pedidoId)
     .eq("pagamento", "pendente");
 
-  if (error) return { erro: "Nao consegui baixar o pagamento." };
+  if (error) return { erro: "Não consegui baixar o pagamento." };
 
   await registrarEvento({
     supabase,
@@ -153,7 +153,7 @@ export async function cancelarPedido(_estado: EstadoAcao, dados: FormData): Prom
   }
 
   const { supabase, user } = await sessao();
-  if (!user) return { erro: "Sessao expirada. Entre de novo." };
+  if (!user) return { erro: "Sessão expirada. Entre de novo." };
 
   const { data: pedido } = await supabase
     .from("pedidos")
@@ -161,8 +161,8 @@ export async function cancelarPedido(_estado: EstadoAcao, dados: FormData): Prom
     .eq("id", resultado.data.pedidoId)
     .single();
 
-  if (!pedido) return { erro: "Pedido nao encontrado." };
-  if (pedido.status === "cancelado") return { erro: "Este pedido ja esta cancelado." };
+  if (!pedido) return { erro: "Pedido não encontrado." };
+  if (pedido.status === "cancelado") return { erro: "Este pedido já está cancelado." };
 
   const { error } = await supabase
     .from("pedidos")
@@ -173,7 +173,7 @@ export async function cancelarPedido(_estado: EstadoAcao, dados: FormData): Prom
     })
     .eq("id", resultado.data.pedidoId);
 
-  if (error) return { erro: "Nao consegui cancelar o pedido." };
+  if (error) return { erro: "Não consegui cancelar o pedido." };
 
   await registrarEvento({
     supabase,
@@ -201,10 +201,10 @@ export async function cancelarPedido(_estado: EstadoAcao, dados: FormData): Prom
 /** Reenvia a arte e o resumo, para quando o cliente pede de novo. */
 export async function reenviarMensagem(_estado: EstadoAcao, dados: FormData): Promise<EstadoAcao> {
   const pedidoId = z.string().uuid().safeParse(dados.get("pedidoId"));
-  if (!pedidoId.success) return { erro: "Pedido invalido." };
+  if (!pedidoId.success) return { erro: "Pedido inválido." };
 
   const { user } = await sessao();
-  if (!user) return { erro: "Sessao expirada. Entre de novo." };
+  if (!user) return { erro: "Sessão expirada. Entre de novo." };
 
   const envio = await enviarWhatsapp(pedidoId.data, "pedido_criado");
   revalidatePath(`/pedidos/${pedidoId.data}`);
@@ -226,17 +226,17 @@ function mensagemDeEnvio(
   if (!envio) return base;
   if (envio.enviado) return `${base} Cliente avisado no WhatsApp.`;
   return envio.link
-    ? `${base} Sem instancia conectada, use o botao para mandar a mensagem.`
-    : `${base} Nao consegui avisar o cliente.`;
+    ? `${base} Sem instância conectada, use o botão para mandar a mensagem.`
+    : `${base} Não consegui avisar o cliente.`;
 }
 
 /** Refaz os arquivos da arte. Serve quando a geracao falhou na hora da venda. */
 export async function regerarArte(_estado: EstadoAcao, dados: FormData): Promise<EstadoAcao> {
   const pedidoId = z.string().uuid().safeParse(dados.get("pedidoId"));
-  if (!pedidoId.success) return { erro: "Pedido invalido." };
+  if (!pedidoId.success) return { erro: "Pedido inválido." };
 
   const { supabase, user } = await sessao();
-  if (!user) return { erro: "Sessao expirada. Entre de novo." };
+  if (!user) return { erro: "Sessão expirada. Entre de novo." };
 
   const { data: pedido } = await supabase
     .from("pedidos")
@@ -244,7 +244,7 @@ export async function regerarArte(_estado: EstadoAcao, dados: FormData): Promise
     .eq("id", pedidoId.data)
     .single();
 
-  if (!pedido) return { erro: "Pedido nao encontrado." };
+  if (!pedido) return { erro: "Pedido não encontrado." };
 
   const { data: tamanho } = await supabase
     .from("tamanhos")
@@ -252,7 +252,7 @@ export async function regerarArte(_estado: EstadoAcao, dados: FormData): Promise
     .eq("codigo", pedido.tamanho_codigo)
     .single();
 
-  if (!tamanho) return { erro: "O tamanho deste pedido nao existe mais no cadastro." };
+  if (!tamanho) return { erro: "O tamanho deste pedido não existe mais no cadastro." };
 
   try {
     const arte = {
@@ -282,7 +282,7 @@ export async function regerarArte(_estado: EstadoAcao, dados: FormData): Promise
       .eq("id", pedido.id);
   } catch (erro) {
     console.error("Falha ao regerar arte", pedido.codigo, erro);
-    return { erro: "A geracao da arte falhou. Confira o link de avaliacao." };
+    return { erro: "A geração da arte falhou. Confira o link de avaliação." };
   }
 
   revalidatePath(`/pedidos/${pedido.id}`);
@@ -319,7 +319,7 @@ async function registrarEvento({
 function rotulo(status: StatusPedido): string {
   const mapa: Record<StatusPedido, string> = {
     novo: "novo",
-    em_producao: "em producao",
+    em_producao: "em produção",
     pronto: "pronto",
     entregue: "entregue",
     cancelado: "cancelado",

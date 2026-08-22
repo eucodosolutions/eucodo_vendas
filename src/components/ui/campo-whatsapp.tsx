@@ -3,11 +3,15 @@
 import { useState, type InputHTMLAttributes, type ReactNode } from "react";
 
 import { Campo } from "./campo";
-import { formatarMascaraWhatsapp, TAMANHO_MASCARA_WHATSAPP } from "@/lib/formato";
+import {
+  formatarMascaraWhatsapp,
+  MASCARA_WHATSAPP,
+  TAMANHO_MASCARA_WHATSAPP,
+} from "@/lib/formato";
 
 type CampoWhatsappProps = Omit<
   InputHTMLAttributes<HTMLInputElement>,
-  "className" | "type" | "value" | "onChange"
+  "className" | "type" | "value" | "onChange" | "placeholder"
 > & {
   rotulo?: string;
   ajuda?: ReactNode;
@@ -38,7 +42,7 @@ export function CampoWhatsapp({
       type="tel"
       inputMode="numeric"
       autoComplete="tel-national"
-      placeholder="(85) 9 8707-3847"
+      placeholder={MASCARA_WHATSAPP}
       maxLength={TAMANHO_MASCARA_WHATSAPP}
       value={valor}
       onChange={(evento) => setValor(formatarMascaraWhatsapp(evento.target.value))}

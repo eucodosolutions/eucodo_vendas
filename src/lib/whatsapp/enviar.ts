@@ -41,7 +41,7 @@ export async function enviarWhatsapp(
     return {
       enviado: false,
       via: "link",
-      erro: error?.message ?? "A funcao de envio nao respondeu.",
+      erro: error?.message ?? "A função de envio não respondeu.",
     };
   }
 

@@ -30,11 +30,19 @@ export function FormularioCriarConta() {
 
   return (
     <form action={acao} className="flex flex-col gap-4">
-      <Campo rotulo="Seu nome" name="nome" autoComplete="name" required autoFocus />
+      <Campo
+        rotulo="Seu nome"
+        name="nome"
+        placeholder="Joel Bernardo"
+        autoComplete="name"
+        required
+        autoFocus
+      />
       <Campo
         rotulo="E-mail"
         name="email"
         type="email"
+        placeholder="voce@empresa.com.br"
         autoComplete="email"
         inputMode="email"
         required
@@ -44,6 +52,7 @@ export function FormularioCriarConta() {
         rotulo="Senha"
         name="senha"
         type="password"
+        placeholder="Pelo menos 8 caracteres"
         autoComplete="new-password"
         required
         minLength={8}
@@ -55,7 +64,7 @@ export function FormularioCriarConta() {
       </Botao>
 
       <p className="text-sm text-tinta-suave">
-        Ja tem acesso?{" "}
+        Já tem acesso?{" "}
         <Link href="/entrar" className="font-medium text-marca hover:underline">
           Entrar
         </Link>

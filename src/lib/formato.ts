@@ -107,13 +107,13 @@ export function validarLinkAvaliacao(bruto: string): string | null {
 export const ROTULO_COR = { branco: "Branco", preto: "Preto" } as const;
 
 export const ROTULO_TECNOLOGIA = {
-  qr: "So QR code",
-  qr_nfc: "QR code + aproximacao",
+  qr: "Só QR code",
+  qr_nfc: "QR code + aproximação",
 } as const;
 
 export const ROTULO_STATUS = {
   novo: "Novo",
-  em_producao: "Em producao",
+  em_producao: "Em produção",
   pronto: "Pronto",
   entregue: "Entregue",
   cancelado: "Cancelado",
@@ -122,7 +122,7 @@ export const ROTULO_STATUS = {
 export const ROTULO_PAGAMENTO = {
   pix: "PIX",
   dinheiro: "Dinheiro",
-  cartao_credito: "Cartao de credito",
-  cartao_debito: "Cartao de debito",
-  transferencia: "Transferencia",
+  cartao_credito: "Cartão de crédito",
+  cartao_debito: "Cartão de débito",
+  transferencia: "Transferência",
 } as const;

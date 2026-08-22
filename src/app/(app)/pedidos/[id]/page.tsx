@@ -72,7 +72,7 @@ export default async function PaginaPedido({ params, searchParams }: PageProps<"
           </h1>
           <p className="text-sm text-tinta-suave">
             Aberto em {dataHora(pedido.criado_em)}
-            {pedido.origem === "publico" ? ", pelo link publico" : ""}
+            {pedido.origem === "publico" ? ", pelo link público" : ""}
           </p>
         </div>
         <p className="text-2xl font-semibold text-tinta tabular-nums">
@@ -93,13 +93,13 @@ export default async function PaginaPedido({ params, searchParams }: PageProps<"
                 />
                 {download ? (
                   <LinkBotao href={download} externo>
-                    Baixar JPG para impressao
+                    Baixar JPG para impressão
                   </LinkBotao>
                 ) : null}
               </>
             ) : (
               <p className="text-sm text-tinta-suave">
-                A arte ainda nao foi gerada para este pedido. Use &quot;Gerar a arte&quot; ao lado.
+                A arte ainda não foi gerada para este pedido. Use &quot;Gerar a arte&quot; ao lado.
               </p>
             )}
           </div>
@@ -114,7 +114,7 @@ export default async function PaginaPedido({ params, searchParams }: PageProps<"
                 valor={`${pedido.tamanho_codigo}, ${ROTULO_COR[pedido.cor].toLowerCase()}, ${ROTULO_TECNOLOGIA[pedido.tecnologia].toLowerCase()}`}
               />
               <Dado rotulo="Quantidade" valor={String(pedido.quantidade)} />
-              <Dado rotulo="Valor unitario" valor={moeda(pedido.preco_unitario_centavos)} />
+              <Dado rotulo="Valor unitário" valor={moeda(pedido.preco_unitario_centavos)} />
               <Dado
                 rotulo="Pagamento"
                 valor={
@@ -125,7 +125,7 @@ export default async function PaginaPedido({ params, searchParams }: PageProps<"
               />
               <div className="sm:col-span-2">
                 <Dado
-                  rotulo="Link de avaliacao"
+                  rotulo="Link de avaliação"
                   valor={
                     <a
                       href={pedido.link_avaliacao}
@@ -140,7 +140,7 @@ export default async function PaginaPedido({ params, searchParams }: PageProps<"
               </div>
               {pedido.observacoes ? (
                 <div className="sm:col-span-2">
-                  <Dado rotulo="Observacoes" valor={pedido.observacoes} />
+                  <Dado rotulo="Observações" valor={pedido.observacoes} />
                 </div>
               ) : null}
               {pedido.motivo_cancelamento ? (
@@ -158,7 +158,7 @@ export default async function PaginaPedido({ params, searchParams }: PageProps<"
             temArte={Boolean(pedido.arte_jpg_path)}
           />
 
-          <Secao titulo="Historico">
+          <Secao titulo="Histórico">
             <ol className="flex flex-col gap-3">
               {(eventos ?? []).map((evento) => (
                 <li key={evento.id} className="flex gap-3 text-sm">
@@ -172,7 +172,7 @@ export default async function PaginaPedido({ params, searchParams }: PageProps<"
                 </li>
               ))}
               {(eventos ?? []).length === 0 ? (
-                <li className="text-sm text-tinta-suave">Sem movimentacoes ainda.</li>
+                <li className="text-sm text-tinta-suave">Sem movimentações ainda.</li>
               ) : null}
             </ol>
           </Secao>

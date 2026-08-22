@@ -52,7 +52,7 @@ Deno.serve(async (requisicao) => {
   const {
     data: { user },
   } = await supabase.auth.getUser(jwt);
-  if (!user) return responder({ erro: "Credencial invalida." }, 401);
+  if (!user) return responder({ erro: "Credencial inválida." }, 401);
 
   const { data: perfil } = await supabase
     .from("perfis")
@@ -61,14 +61,14 @@ Deno.serve(async (requisicao) => {
     .single();
 
   if (perfil?.status !== "ativo") {
-    return responder({ erro: "Acesso nao liberado." }, 403);
+    return responder({ erro: "Acesso não liberado." }, 403);
   }
 
   let corpo: Corpo;
   try {
     corpo = await requisicao.json();
   } catch {
-    return responder({ erro: "Corpo invalido." }, 400);
+    return responder({ erro: "Corpo inválido." }, 400);
   }
 
   if (!corpo.pedidoId || (!corpo.chave && !corpo.textoManual)) {
@@ -83,10 +83,10 @@ Deno.serve(async (requisicao) => {
     .eq("id", corpo.pedidoId)
     .single();
 
-  if (!pedido) return responder({ erro: "Pedido nao encontrado." }, 404);
+  if (!pedido) return responder({ erro: "Pedido não encontrado." }, 404);
 
   const texto = corpo.textoManual ?? (await montarTexto(supabase, corpo.chave, pedido));
-  if (!texto) return responder({ erro: "Modelo de mensagem nao encontrado." }, 404);
+  if (!texto) return responder({ erro: "Modelo de mensagem não encontrado." }, 404);
 
   const instancia = await instanciaAtiva(supabase);
   const linkManual = montarLinkWhatsapp(pedido.whatsapp, texto);
@@ -100,7 +100,7 @@ Deno.serve(async (requisicao) => {
       temMidia: false,
       via: "link",
       sucesso: false,
-      erro: "Sem instancia conectada, enviado por link",
+      erro: "Sem instância conectada, enviado por link",
     });
 
     return responder<Resultado>({ enviado: false, via: "link", link: linkManual, texto });
@@ -263,7 +263,7 @@ async function montarTexto(supabase: any, chave: string, pedido: any): Promise<s
     codigo: pedido.codigo,
     tamanho: pedido.tamanho_codigo,
     cor: pedido.cor === "branco" ? "branco" : "preto",
-    tecnologia: pedido.tecnologia === "qr_nfc" ? "QR code e aproximacao" : "QR code",
+    tecnologia: pedido.tecnologia === "qr_nfc" ? "QR code e aproximação" : "QR code",
     quantidade: String(pedido.quantidade),
     total: formatarMoeda(pedido.total_centavos),
   };

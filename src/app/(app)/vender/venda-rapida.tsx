@@ -50,9 +50,9 @@ export function VendaRapida({ tamanhos }: { tamanhos: TamanhoComVariantes[] }) {
   return (
     <div className="flex flex-col gap-5">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-tinta">Venda rapida</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-tinta">Venda rápida</h1>
         <p className="mt-1 text-sm text-tinta-suave">
-          Mostre os precos na tela, escolha o modelo e feche o pedido.
+          Mostre os preços na tela, escolha o modelo e feche o pedido.
         </p>
       </header>
 
@@ -74,7 +74,7 @@ export function VendaRapida({ tamanhos }: { tamanhos: TamanhoComVariantes[] }) {
             titulo="Tecnologia"
             opcoes={TECNOLOGIAS.map((valor) => ({
               valor,
-              rotulo: valor === "qr_nfc" ? "QR + aproximacao" : "So QR code",
+              rotulo: valor === "qr_nfc" ? "QR + aproximação" : "Só QR code",
               detalhe: precoDe(tamanho, valor, cor),
             }))}
             selecionado={tecnologia}
@@ -100,13 +100,14 @@ export function VendaRapida({ tamanhos }: { tamanhos: TamanhoComVariantes[] }) {
               {ROTULO_TECNOLOGIA[tecnologia].toLowerCase()}
             </span>
             <p className="mt-1 text-4xl font-semibold tracking-tight text-tinta tabular-nums">
-              {variante ? moeda(variante.preco_centavos) : "Indisponivel"}
+              {variante ? moeda(variante.preco_centavos) : "Indisponível"}
             </p>
           </div>
           <div className="w-24">
             <Campo
               rotulo="Quantidade"
               name="quantidade"
+              placeholder="1"
               form="formulario-pedido"
               type="number"
               min={1}
@@ -125,32 +126,36 @@ export function VendaRapida({ tamanhos }: { tamanhos: TamanhoComVariantes[] }) {
           <div className="flex flex-col gap-4">
             {!variante ? (
               <p className="rounded-lg bg-atencao-suave px-3.5 py-3 text-sm font-medium text-atencao">
-                Essa combinacao ainda nao tem preco cadastrado. Escolha outra ou cadastre em
+                Essa combinação ainda não tem preço cadastrado. Escolha outra ou cadastre em
                 Ajustes.
               </p>
             ) : null}
 
             <Campo
-              rotulo="Nome do negocio"
+              rotulo="Nome do negócio"
               name="nomeNegocio"
               required
               autoComplete="organization"
               placeholder="Barbearia Vintage"
-              ajuda="E este nome que vai impresso no display, no lugar do logo do Google."
+              ajuda="É este nome que vai impresso no display, no lugar do logo do Google."
             />
 
             <CampoWhatsapp rotulo="WhatsApp do cliente" required />
 
             <Campo
-              rotulo="Link de avaliacao do Google"
+              rotulo="Link de avaliação do Google"
               name="linkAvaliacao"
               required
               inputMode="url"
               placeholder="https://g.page/r/.../review"
-              ajuda="Aceita o link do g.page, o encurtado do Maps ou o endereco completo."
+              ajuda="Aceita o link do g.page, o encurtado do Maps ou o endereço completo."
             />
 
-            <Campo rotulo="Observacoes" name="observacoes" placeholder="Opcional, so para voce" />
+            <Campo
+              rotulo="Observações"
+              name="observacoes"
+              placeholder="Opcional, só para você"
+            />
           </div>
         </Secao>
 
@@ -178,7 +183,7 @@ function precoDe(tamanho: TamanhoComVariantes, tecnologia: TecnologiaArte, cor: 
   const variante = tamanho.variantes.find(
     (item) => item.tecnologia === tecnologia && item.cor === cor,
   );
-  return variante ? moeda(variante.preco_centavos) : "Sem preco";
+  return variante ? moeda(variante.preco_centavos) : "Sem preço";
 }
 
 function formatarMm(valor: number): string {

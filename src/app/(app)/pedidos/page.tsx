@@ -84,7 +84,7 @@ export default async function PaginaPedidos() {
                   </p>
                   <p className="text-sm text-tinta-suave">
                     {pedido.tamanho_codigo} {ROTULO_COR[pedido.cor].toLowerCase()},{" "}
-                    {pedido.tecnologia === "qr_nfc" ? "com NFC" : "so QR"}
+                    {pedido.tecnologia === "qr_nfc" ? "com NFC" : "só QR"}
                     {pedido.quantidade > 1 ? `, ${pedido.quantidade} unidades` : ""}
                     {" | "}
                     {whatsappLegivel(pedido.whatsapp)}

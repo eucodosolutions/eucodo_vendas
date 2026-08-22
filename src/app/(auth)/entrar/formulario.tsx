@@ -20,12 +20,20 @@ export function FormularioEntrar({ proxima }: { proxima?: string }) {
         rotulo="E-mail"
         name="email"
         type="email"
+        placeholder="voce@empresa.com.br"
         autoComplete="email"
         inputMode="email"
         required
         autoFocus
       />
-      <Campo rotulo="Senha" name="senha" type="password" autoComplete="current-password" required />
+      <Campo
+        rotulo="Senha"
+        name="senha"
+        type="password"
+        placeholder="Sua senha"
+        autoComplete="current-password"
+        required
+      />
 
       <Botao type="submit" carregandoTexto="Entrando..." larguraTotal>
         Entrar

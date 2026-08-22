@@ -13,9 +13,9 @@ export type EstadoVenda = { erro?: string };
 
 const esquema = z.object({
   varianteId: z.string().uuid("Escolha um modelo de display."),
-  nomeNegocio: z.string().trim().min(2, "Digite o nome do negocio."),
+  nomeNegocio: z.string().trim().min(2, "Digite o nome do negócio."),
   whatsapp: z.string().trim().min(1, "Digite o WhatsApp do cliente."),
-  linkAvaliacao: z.string().trim().min(1, "Cole o link de avaliacao do Google."),
+  linkAvaliacao: z.string().trim().min(1, "Cole o link de avaliação do Google."),
   placeId: z.string().trim().optional(),
   quantidade: z.coerce.number().int().min(1).max(999),
   observacoes: z.string().trim().max(500).optional(),
@@ -38,13 +38,13 @@ export async function criarPedido(_estado: EstadoVenda, dados: FormData): Promis
 
   const whatsapp = normalizarWhatsapp(resultado.data.whatsapp);
   if (!whatsapp) {
-    return { erro: "Esse WhatsApp nao parece valido. Confira o DDD e o numero." };
+    return { erro: "Esse WhatsApp não parece válido. Confira o DDD e o número." };
   }
 
   const linkAvaliacao = validarLinkAvaliacao(resultado.data.linkAvaliacao);
   if (!linkAvaliacao) {
     return {
-      erro: "Esse link nao parece do Google. Use o link de avaliacao do perfil do negocio.",
+      erro: "Esse link não parece do Google. Use o link de avaliação do perfil do negócio.",
     };
   }
 
@@ -78,7 +78,7 @@ export async function criarPedido(_estado: EstadoVenda, dados: FormData): Promis
     }>();
 
   if (erroVariante || !variante) {
-    return { erro: "Esse modelo nao esta mais disponivel. Escolha outro." };
+    return { erro: "Esse modelo não está mais disponível. Escolha outro." };
   }
 
   const quantidade = resultado.data.quantidade;
@@ -114,7 +114,7 @@ export async function criarPedido(_estado: EstadoVenda, dados: FormData): Promis
     .single();
 
   if (erroPedido || !pedido) {
-    return { erro: "Nao consegui gravar o pedido. Tente de novo." };
+    return { erro: "Não consegui gravar o pedido. Tente de novo." };
   }
 
   await gerarEGuardarArte({

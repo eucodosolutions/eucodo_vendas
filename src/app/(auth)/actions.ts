@@ -65,8 +65,8 @@ export async function entrar(
     const falhaDeRede = error?.name === "AuthRetryableFetchError" || error?.status === 0;
     return {
       erro: falhaDeRede
-        ? "Nao consegui falar com o servidor. Confira a configuracao do Supabase."
-        : "E-mail ou senha nao conferem.",
+        ? "Não consegui falar com o servidor. Confira a configuração do Supabase."
+        : "E-mail ou senha não conferem.",
     };
   }
 
@@ -83,7 +83,7 @@ export async function entrar(
       erro:
         perfil?.status === "bloqueado"
           ? "Este acesso foi bloqueado. Fale com o administrador."
-          : "Sua conta ainda esta aguardando liberacao do administrador.",
+          : "Sua conta ainda está aguardando liberação do administrador.",
     };
   }
 
@@ -105,7 +105,7 @@ export async function criarConta(
 
   const whatsapp = normalizarWhatsapp(resultado.data.whatsapp);
   if (!whatsapp) {
-    return { erro: "Esse WhatsApp nao parece valido. Confira o DDD e o numero." };
+    return { erro: "Esse WhatsApp não parece válido. Confira o DDD e o número." };
   }
 
   const supabase = await createClient();
@@ -116,7 +116,7 @@ export async function criarConta(
   });
 
   if (error) {
-    return { erro: "Nao consegui criar a conta. Tente de novo em instantes." };
+    return { erro: "Não consegui criar a conta. Tente de novo em instantes." };
   }
 
   return {
@@ -142,7 +142,7 @@ export async function enviarLinkDeSenha(
   // A resposta e sempre a mesma, com ou sem conta. Dizer "este e-mail nao
   // existe" entregaria a lista de usuarios para quem estiver testando.
   return {
-    sucesso: "Se existir uma conta com esse e-mail, o link de redefinicao acabou de sair.",
+    sucesso: "Se existir uma conta com esse e-mail, o link de redefinição acabou de sair.",
   };
 }
 
@@ -162,12 +162,12 @@ export async function redefinirSenha(
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { erro: "O link expirou. Peca um novo e-mail de redefinicao." };
+    return { erro: "O link expirou. Peça um novo e-mail de redefinição." };
   }
 
   const { error } = await supabase.auth.updateUser({ password: resultado.data.senha });
   if (error) {
-    return { erro: "Nao consegui trocar a senha. Peca um novo link e tente de novo." };
+    return { erro: "Não consegui trocar a senha. Peça um novo link e tente de novo." };
   }
 
   redirect("/vender");

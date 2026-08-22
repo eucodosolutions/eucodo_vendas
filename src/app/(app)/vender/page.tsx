@@ -28,7 +28,7 @@ export default async function PaginaVender() {
       <Secao>
         <h1 className="text-lg font-semibold tracking-tight text-tinta">Nenhum modelo cadastrado</h1>
         <p className="mt-2 text-sm text-tinta-suave">
-          Cadastre pelo menos um tamanho com preco em Ajustes para comecar a vender.
+          Cadastre pelo menos um tamanho com preço em Ajustes para começar a vender.
         </p>
       </Secao>
     );

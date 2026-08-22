@@ -64,16 +64,16 @@ export function AcoesDoPedido({
 
   if (cancelado) {
     return (
-      <Secao titulo="Acoes">
+      <Secao titulo="Ações">
         <p className="text-sm text-tinta-suave">
-          Este pedido esta cancelado. Nao da para mudar status nem baixar pagamento.
+          Este pedido está cancelado. Não dá para mudar status nem baixar pagamento.
         </p>
       </Secao>
     );
   }
 
   return (
-    <Secao titulo="Acoes">
+    <Secao titulo="Ações">
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-end gap-3">
           {PROXIMO_STATUS[status].map((proximo) => (
@@ -126,18 +126,18 @@ export function AcoesDoPedido({
           <form action={acaoCancelar} className="flex flex-col gap-3 border-t border-borda pt-4">
             <input type="hidden" name="pedidoId" value={pedidoId} />
             <Campo
-              rotulo="Por que este pedido esta sendo cancelado?"
+              rotulo="Por que este pedido está sendo cancelado?"
               name="motivo"
               required
               minLength={3}
-              placeholder="Cliente desistiu, dado errado, pagamento nao veio"
+              placeholder="Cliente desistiu, dado errado, pagamento não veio"
             />
             <div className="flex flex-wrap gap-3">
               <Botao type="submit" variante="secundario" carregandoTexto="Cancelando...">
                 Confirmar cancelamento
               </Botao>
               <Botao type="button" variante="fantasma" onClick={() => setMostrarCancelamento(false)}>
-                Deixar como esta
+                Deixar como está
               </Botao>
             </div>
           </form>

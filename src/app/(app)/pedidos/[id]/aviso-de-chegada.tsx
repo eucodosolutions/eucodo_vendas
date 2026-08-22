@@ -19,7 +19,7 @@ export function AvisoDeChegada({ envio }: { envio?: string }) {
 
     if (envio === "link") {
       avisar.atencao(
-        "Pedido criado e arte gerada. Sem instancia conectada, use Mandar a arte no WhatsApp.",
+        "Pedido criado e arte gerada. Sem instância conectada, use Mandar a arte no WhatsApp.",
       );
     } else {
       avisar.sucesso("Pedido criado, arte gerada e mensagem enviada para o cliente.");

@@ -18,6 +18,7 @@ export function FormularioEsqueciSenha() {
         rotulo="E-mail"
         name="email"
         type="email"
+        placeholder="voce@empresa.com.br"
         autoComplete="email"
         inputMode="email"
         required

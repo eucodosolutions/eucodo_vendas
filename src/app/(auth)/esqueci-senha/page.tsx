@@ -9,7 +9,7 @@ export default function PaginaEsqueciSenha() {
     <>
       <h1 className="text-xl font-semibold tracking-tight text-tinta">Esqueci minha senha</h1>
       <p className="mt-1 mb-6 text-sm text-tinta-suave">
-        Digite seu e-mail e eu mando um link para voce criar uma nova senha.
+        Digite seu e-mail e eu mando um link para você criar uma nova senha.
       </p>
       <FormularioEsqueciSenha />
     </>

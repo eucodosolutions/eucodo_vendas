@@ -17,6 +17,7 @@ export function FormularioRedefinirSenha() {
         rotulo="Nova senha"
         name="senha"
         type="password"
+        placeholder="Pelo menos 8 caracteres"
         autoComplete="new-password"
         required
         minLength={8}
@@ -27,6 +28,7 @@ export function FormularioRedefinirSenha() {
         rotulo="Repita a nova senha"
         name="confirmacao"
         type="password"
+        placeholder="Digite a senha de novo"
         autoComplete="new-password"
         required
         minLength={8}

@@ -13,6 +13,8 @@ import {
 
 type CampoProps = Omit<InputHTMLAttributes<HTMLInputElement>, "className"> & {
   rotulo: string;
+  /** Obrigatório: todo campo do sistema mostra um exemplo do que se espera. */
+  placeholder: string;
   ajuda?: ReactNode;
   erro?: string;
 };
@@ -20,8 +22,9 @@ type CampoProps = Omit<InputHTMLAttributes<HTMLInputElement>, "className"> & {
 /**
  * Campo de formulario do sistema.
  *
- * Quando o tipo e senha, o botao de mostrar e ocultar vem junto, sem ninguem
- * precisar lembrar de adicionar. Senha digitada as cegas no celular, no meio de
+ * Duas coisas o proprio componente garante, para nao depender de lembranca de
+ * quem escreve a tela: senha sempre vem com o botao de mostrar e ocultar, e
+ * todo campo pede placeholder. Senha digitada as cegas no celular, no meio de
  * uma venda, e erro de digitacao garantido.
  */
 export function Campo({ rotulo, ajuda, erro, id, type = "text", ...props }: CampoProps) {
