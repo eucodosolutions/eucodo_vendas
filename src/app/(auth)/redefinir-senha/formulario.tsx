@@ -21,7 +21,6 @@ export function FormularioRedefinirSenha() {
         autoComplete="new-password"
         required
         minLength={8}
-        ajuda="Pelo menos 8 caracteres."
         autoFocus
       />
       <Campo

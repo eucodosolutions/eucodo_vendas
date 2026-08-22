@@ -38,7 +38,7 @@ export function Campo({ rotulo, ajuda, erro, id, type = "text", ...props }: Camp
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={campoId} className="text-sm font-medium text-tinta">
+      <label htmlFor={campoId} className="text-rotulo font-medium text-tinta">
         {rotulo}
       </label>
 

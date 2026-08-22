@@ -20,7 +20,7 @@ export function Selecao({ rotulo, rotuloOculto, opcoes, id, ...props }: SelecaoP
     <div className="flex flex-col gap-1.5">
       <label
         htmlFor={campoId}
-        className={rotuloOculto ? "sr-only" : "text-sm font-medium text-tinta"}
+        className={rotuloOculto ? "sr-only" : "text-rotulo font-medium text-tinta"}
       >
         {rotulo}
       </label>

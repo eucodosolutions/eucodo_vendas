@@ -56,7 +56,6 @@ export function FormularioCriarConta() {
         autoComplete="new-password"
         required
         minLength={8}
-        ajuda="Pelo menos 8 caracteres."
       />
 
       <Botao type="submit" carregandoTexto="Criando..." larguraTotal>

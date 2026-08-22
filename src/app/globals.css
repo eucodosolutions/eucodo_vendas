@@ -20,10 +20,16 @@
   --color-sucesso-suave: #e6f5ec;
   --color-atencao: #b45309;
   --color-atencao-suave: #fdf3e3;
-  --color-erro: #d93025;
+  --color-erro: #c5221f;
   --color-erro-suave: #fdecea;
+  --color-info: #0b57d0;
+  --color-info-suave: #e8f0fe;
 
   --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+
+  /* Rotulo de campo: menor que o texto do proprio campo, para o valor digitado
+     continuar sendo o elemento mais forte da linha. */
+  --text-rotulo: 0.8125rem;
 
   --radius-card: 0.75rem;
 }
@@ -50,4 +56,66 @@ body {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/*
+  Toasts.
+  A cor mora aqui, presa ao `data-type` que o sonner escreve no elemento, e nao
+  em classe utilitaria com !important disputando com o estilo interno dele.
+  Fundo suave, borda no tom e icone no tom: o texto continua em tinta, que e
+  quem precisa ser lido.
+
+  O prefixo `html` nao e enfeite: o sonner injeta o CSS dele em tempo de
+  execucao, no fim do <head>, entao regra de mesma especificidade que a dele
+  perde por vir antes. O seletor extra desempata.
+*/
+
+html [data-sonner-toast] {
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-borda);
+  background: var(--color-superficie);
+  color: var(--color-tinta);
+  font-size: 0.875rem;
+}
+
+html [data-sonner-toast] [data-description] {
+  color: var(--color-tinta-suave);
+}
+
+html [data-sonner-toast] [data-close-button] {
+  background: var(--color-superficie);
+  border-color: var(--color-borda);
+  color: var(--color-tinta-suave);
+}
+
+html [data-sonner-toast][data-type="success"] {
+  background: var(--color-sucesso-suave);
+  border-color: color-mix(in srgb, var(--color-sucesso) 32%, transparent);
+}
+html [data-sonner-toast][data-type="success"] [data-icon] {
+  color: var(--color-sucesso);
+}
+
+html [data-sonner-toast][data-type="error"] {
+  background: var(--color-erro-suave);
+  border-color: color-mix(in srgb, var(--color-erro) 32%, transparent);
+}
+html [data-sonner-toast][data-type="error"] [data-icon] {
+  color: var(--color-erro);
+}
+
+html [data-sonner-toast][data-type="warning"] {
+  background: var(--color-atencao-suave);
+  border-color: color-mix(in srgb, var(--color-atencao) 32%, transparent);
+}
+html [data-sonner-toast][data-type="warning"] [data-icon] {
+  color: var(--color-atencao);
+}
+
+html [data-sonner-toast][data-type="info"] {
+  background: var(--color-info-suave);
+  border-color: color-mix(in srgb, var(--color-info) 32%, transparent);
+}
+html [data-sonner-toast][data-type="info"] [data-icon] {
+  color: var(--color-info);
 }
