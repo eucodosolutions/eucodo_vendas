@@ -1,26 +1,53 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+  A paleta vem da marca Eucodo: azul marinho para texto, azul vivo para acao.
+  O painel e usado no celular, com o cliente do lado, entao contraste alto e
+  area de toque grande valem mais que sutileza.
+*/
+@theme {
+  --color-tinta: #09192e;
+  --color-tinta-media: #46586e;
+  --color-tinta-suave: #6b7d92;
+  --color-papel: #f4f6f8;
+  --color-superficie: #ffffff;
+  --color-borda: #dde3ea;
+  --color-borda-forte: #c3ccd7;
+  --color-marca: #0360fe;
+  --color-marca-escura: #004de6;
+  --color-marca-suave: #e8f0ff;
+  --color-sucesso: #0f9d58;
+  --color-sucesso-suave: #e6f5ec;
+  --color-atencao: #b45309;
+  --color-atencao-suave: #fdf3e3;
+  --color-erro: #d93025;
+  --color-erro-suave: #fdecea;
+
+  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 0.75rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-papel);
+  color: var(--color-tinta);
+}
+
+/* O foco precisa aparecer: o painel e operado no meio de uma conversa. */
+:focus-visible {
+  outline: 2px solid var(--color-marca);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

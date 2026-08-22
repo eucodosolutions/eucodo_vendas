@@ -1,0 +1,85 @@
+name: Banco
+
+# Existe um banco so, o de producao. Por isso as duas travas deste arquivo:
+#
+#   1. Todo pull request roda `db push --dry-run`. Como nao ha ambiente de
+#      teste, o dry-run e o unico portao de qualidade antes do banco real.
+#   2. So o push em `main` aplica de verdade.
+#
+# Os dois jobs declaram `environment: producao` porque os segredos estao
+# cadastrados como segredos de environment, e nao no nivel do repositorio.
+# Sem essa linha, `secrets.SUPABASE_ACCESS_TOKEN` chega vazio.
+#
+# SUPABASE_PROJECT_REF esta como variavel, nao segredo, entao vem de `vars`.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/functions/**"
+      - "supabase/config.toml"
+      - ".github/workflows/banco.yml"
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/functions/**"
+      - "supabase/config.toml"
+  workflow_dispatch:
+
+concurrency:
+  group: banco-producao
+  cancel-in-progress: false
+
+jobs:
+  simular:
+    name: Simular migrations
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    environment: producao
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Conectar no projeto
+        run: supabase link --project-ref "$PROJECT_REF"
+
+      - name: Simular sem aplicar
+        run: supabase db push --dry-run
+
+  aplicar:
+    name: Aplicar em producao
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: producao
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Conectar no projeto
+        run: supabase link --project-ref "$PROJECT_REF"
+
+      - name: Aplicar migrations
+        run: supabase db push
+
+      - name: Publicar Edge Functions
+        run: |
+          if [ -d supabase/functions ] && [ -n "$(ls -A supabase/functions 2>/dev/null)" ]; then
+            supabase functions deploy --project-ref "$PROJECT_REF"
+          else
+            echo "Nenhuma Edge Function para publicar."
+          fi

@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# artes e paginas geradas para conferencia
+/.preview/
+/.next-check/
+
+# o exemplo entra no repositorio, os valores reais nao
+!.env.example

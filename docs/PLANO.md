@@ -24,6 +24,13 @@ Mesma dos outros sistemas da casa (OnPulso, Somma360):
 - WhatsApp: uazapi (REST, texto + midia)
 - Deploy: Vercel
 
+## Tamanhos sao dado, nao codigo
+
+Cada tamanho e um registro com largura, altura, margem de seguranca, sangria e
+DPI. Cadastrar um formato novo nao exige deploy, e cada assinante pode usar o
+proprio formato quando o sistema virar microsaas. Sementes: A6 107 x 150 mm e
+A5 150 x 212 mm, margem de 7 mm, 300 DPI.
+
 ## Catalogo (8 SKUs)
 
 | Tamanho | Arte | Tecnologia |
@@ -94,12 +101,17 @@ Tudo salvo no Supabase Storage, em bucket privado com URL assinada.
 
 ## Fases
 
-1. Scaffold, Supabase, migrations, auth completo, 404
-2. Motor de arte (SVG, QR, rasterizacao) e as 4 variacoes visuais aprovadas
-3. Tela de venda rapida + Places + criacao de pedido
-4. uazapi: envio da arte, do resumo e do PIX
-5. Painel: lista, detalhe, downloads, status com notificacao, cancelar, baixar pagamento
-6. Link publico de catalogo e pedido
+1. [feito] Scaffold, migrations, auth completo, 404
+2. [feito] Motor de arte (SVG, QR, rasterizacao), medidas confirmadas em 22/08/2026
+3. [feito] Tela de venda rapida e criacao de pedido com arte gerada e guardada
+4. [feito] Painel: lista, detalhe, download do JPG, status, cancelar, baixar pagamento
+5. uazapi: envio da arte, do resumo e das notificacoes de status
+6. PIX copia e cola na mesma mensagem
+7. Busca do link de avaliacao pelo nome (Google Places)
+8. Link publico de catalogo e de pedido
+9. Ajustes: precos, tamanhos, modelos de mensagem, liberacao de contas
+
+Passo a passo para subir o ambiente: `docs/CONFIGURACAO.md`.
 
 ## Pendencias com o Joel
 
@@ -108,4 +120,6 @@ Tudo salvo no Supabase Storage, em bucket privado com URL assinada.
 - uazapi: host do servidor e token da instancia
 - Google Places API key
 - Prazo de producao e regra de entrega/frete
+- Confirmar a medida do A6: os px enviados (1216,54 x 1724,41) equivalem a
+  103 x 146 mm, e nao aos 107 x 150 mm informados. O A5 ja fechou em 150 x 212 mm.
 - Confirmar se a arte ocupa o A5/A6 inteiro ou tem area util menor no display
