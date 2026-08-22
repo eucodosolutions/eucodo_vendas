@@ -10,8 +10,9 @@ values
   ('A5', 'A5', 150, 212, 7, 0, 300, 2)
 on conflict (codigo) do nothing;
 
+-- Os literais da lista abaixo chegam como text: o cast para o enum e explicito.
 insert into public.variantes (tamanho_id, cor, tecnologia, preco_centavos)
-select t.id, v.cor, v.tecnologia, v.preco
+select t.id, v.cor::public.cor_arte, v.tecnologia::public.tecnologia_arte, v.preco
 from public.tamanhos t
 join (
   values
