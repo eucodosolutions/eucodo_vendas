@@ -43,6 +43,32 @@ body {
   color: var(--color-tinta);
 }
 
+/*
+  Maozinha em tudo que responde ao clique.
+  O Tailwind 4 deixou de dar `cursor: pointer` ao botao, e sair marcando classe
+  em cada componente seria uma regra a lembrar para sempre. Aqui vale de uma
+  vez, inclusive para o que ainda vai ser escrito.
+*/
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary,
+select:not(:disabled),
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled) {
+  cursor: pointer;
+}
+
+/* Em regra propria: o compilador descarta pseudo-elemento em lista de seletor. */
+input[type="file"]::file-selector-button {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 /* O foco precisa aparecer: o painel e operado no meio de uma conversa. */
 :focus-visible {
   outline: 2px solid var(--color-marca);

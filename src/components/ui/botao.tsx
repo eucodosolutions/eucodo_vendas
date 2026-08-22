@@ -40,7 +40,7 @@ export function Botao({
       disabled={travado}
       className={juntar(
         ALTURA_CONTROLE,
-        "inline-flex items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium whitespace-nowrap transition-colors disabled:cursor-not-allowed",
+        "inline-flex items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium whitespace-nowrap transition-colors",
         ESTILOS[variante],
         larguraTotal && "w-full",
       )}
