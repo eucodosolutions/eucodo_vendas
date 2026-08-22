@@ -6,12 +6,15 @@ import {
   cancelarPedido,
   marcarPago,
   mudarStatus,
-  regerarArte,
   reenviarMensagem,
+  regerarArte,
   type EstadoAcao,
 } from "./acoes";
-import { Alerta } from "@/components/ui/alerta";
+import { useAviso } from "@/components/ui/avisos";
 import { Botao } from "@/components/ui/botao";
+import { Campo } from "@/components/ui/campo";
+import { Secao } from "@/components/ui/secao";
+import { Selecao } from "@/components/ui/selecao";
 import { ROTULO_PAGAMENTO, ROTULO_STATUS } from "@/lib/formato";
 import type { FormaPagamento, StatusPagamento, StatusPedido } from "@/types/database";
 
@@ -48,42 +51,32 @@ export function AcoesDoPedido({
   const [estadoArte, acaoArte] = useActionState<EstadoAcao, FormData>(regerarArte, {});
   const [estadoEnvio, acaoEnvio] = useActionState<EstadoAcao, FormData>(reenviarMensagem, {});
 
+  // Cada acao avisa por conta propria. O toast que traz o link do WhatsApp
+  // carrega o botao de abrir a conversa, entao nada precisa ficar na tela.
+  useAviso(estadoStatus);
+  useAviso(estadoPagamento);
+  useAviso(estadoCancelar);
+  useAviso(estadoArte);
+  useAviso(estadoEnvio);
+
   const [mostrarCancelamento, setMostrarCancelamento] = useState(false);
-  const [forma, setForma] = useState<FormaPagamento>("pix");
-
   const cancelado = status === "cancelado";
-  const proximos = PROXIMO_STATUS[status];
-  const estados = [estadoStatus, estadoPagamento, estadoCancelar, estadoArte, estadoEnvio];
-  const mensagem =
-    estados.find((estado) => estado.erro)?.erro ?? estados.find((estado) => estado.sucesso)?.sucesso;
-  const ehErro = estados.some((estado) => estado.erro);
-  const linkManual = estados.find((estado) => estado.link)?.link;
 
-  return (
-    <section className="flex flex-col gap-4 rounded-card border border-borda bg-superficie p-5">
-      <h2 className="text-sm font-semibold tracking-wide text-tinta-suave uppercase">Acoes</h2>
-
-      {mensagem ? <Alerta tom={ehErro ? "erro" : "sucesso"}>{mensagem}</Alerta> : null}
-
-      {/* Sem instancia conectada, a mensagem sai daqui, aberta pelo vendedor. */}
-      {linkManual ? (
-        <a
-          href={linkManual}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="inline-flex h-12 items-center justify-center gap-2 self-start rounded-lg bg-sucesso px-5 text-base font-medium text-white transition-opacity hover:opacity-90"
-        >
-          Abrir WhatsApp com a mensagem pronta
-        </a>
-      ) : null}
-
-      {cancelado ? (
+  if (cancelado) {
+    return (
+      <Secao titulo="Acoes">
         <p className="text-sm text-tinta-suave">
           Este pedido esta cancelado. Nao da para mudar status nem baixar pagamento.
         </p>
-      ) : (
-        <div className="flex flex-wrap gap-3">
-          {proximos.map((proximo) => (
+      </Secao>
+    );
+  }
+
+  return (
+    <Secao titulo="Acoes">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-end gap-3">
+          {PROXIMO_STATUS[status].map((proximo) => (
             <form key={proximo} action={acaoStatus}>
               <input type="hidden" name="pedidoId" value={pedidoId} />
               <input type="hidden" name="status" value={proximo} />
@@ -94,21 +87,20 @@ export function AcoesDoPedido({
           ))}
 
           {pagamento === "pendente" ? (
-            <form action={acaoPagamento} className="flex flex-wrap items-center gap-2">
+            <form action={acaoPagamento} className="flex flex-wrap items-end gap-2">
               <input type="hidden" name="pedidoId" value={pedidoId} />
-              <select
-                name="forma"
-                value={forma}
-                onChange={(evento) => setForma(evento.target.value as FormaPagamento)}
-                aria-label="Forma de pagamento"
-                className="h-12 rounded-lg border border-borda bg-superficie px-3 text-base text-tinta"
-              >
-                {FORMAS.map((valor) => (
-                  <option key={valor} value={valor}>
-                    {ROTULO_PAGAMENTO[valor]}
-                  </option>
-                ))}
-              </select>
+              <div className="w-44">
+                <Selecao
+                  rotulo="Forma de pagamento"
+                  rotuloOculto
+                  name="forma"
+                  defaultValue="pix"
+                  opcoes={FORMAS.map((valor) => ({
+                    valor,
+                    texto: ROTULO_PAGAMENTO[valor],
+                  }))}
+                />
+              </div>
               <Botao type="submit" variante="secundario" carregandoTexto="Salvando...">
                 Marcar como pago
               </Botao>
@@ -129,34 +121,24 @@ export function AcoesDoPedido({
             </Botao>
           </form>
         </div>
-      )}
 
-      {!cancelado ? (
-        mostrarCancelamento ? (
+        {mostrarCancelamento ? (
           <form action={acaoCancelar} className="flex flex-col gap-3 border-t border-borda pt-4">
             <input type="hidden" name="pedidoId" value={pedidoId} />
-            <label htmlFor="motivo" className="text-sm font-medium text-tinta">
-              Por que este pedido esta sendo cancelado?
-            </label>
-            <input
-              id="motivo"
+            <Campo
+              rotulo="Por que este pedido esta sendo cancelado?"
               name="motivo"
               required
               minLength={3}
               placeholder="Cliente desistiu, dado errado, pagamento nao veio"
-              className="h-12 rounded-lg border border-borda bg-superficie px-3.5 text-base text-tinta"
             />
             <div className="flex flex-wrap gap-3">
               <Botao type="submit" variante="secundario" carregandoTexto="Cancelando...">
                 Confirmar cancelamento
               </Botao>
-              <button
-                type="button"
-                onClick={() => setMostrarCancelamento(false)}
-                className="h-12 rounded-lg px-4 text-sm font-medium text-tinta-media hover:bg-papel"
-              >
+              <Botao type="button" variante="fantasma" onClick={() => setMostrarCancelamento(false)}>
                 Deixar como esta
-              </button>
+              </Botao>
             </div>
           </form>
         ) : (
@@ -167,8 +149,8 @@ export function AcoesDoPedido({
           >
             Cancelar pedido
           </button>
-        )
-      ) : null}
-    </section>
+        )}
+      </div>
+    </Secao>
   );
 }

@@ -4,18 +4,16 @@ import Link from "next/link";
 import { useActionState } from "react";
 
 import { enviarLinkDeSenha, type EstadoFormulario } from "../actions";
-import { Alerta } from "@/components/ui/alerta";
+import { useAviso } from "@/components/ui/avisos";
 import { Botao } from "@/components/ui/botao";
 import { Campo } from "@/components/ui/campo";
 
 export function FormularioEsqueciSenha() {
   const [estado, acao] = useActionState<EstadoFormulario, FormData>(enviarLinkDeSenha, {});
+  useAviso(estado);
 
   return (
     <form action={acao} className="flex flex-col gap-4">
-      {estado.erro ? <Alerta tom="erro">{estado.erro}</Alerta> : null}
-      {estado.sucesso ? <Alerta tom="sucesso">{estado.sucesso}</Alerta> : null}
-
       <Campo
         rotulo="E-mail"
         name="email"
@@ -26,7 +24,7 @@ export function FormularioEsqueciSenha() {
         autoFocus
       />
 
-      <Botao type="submit" carregandoTexto="Enviando...">
+      <Botao type="submit" carregandoTexto="Enviando..." larguraTotal>
         Enviar link
       </Botao>
 

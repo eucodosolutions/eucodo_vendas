@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { EtiquetaPagamento, EtiquetaStatus } from "@/components/etiquetas";
+import { LinkBotao } from "@/components/ui/link-botao";
 import { dataHora, moeda, ROTULO_COR, whatsappLegivel } from "@/lib/formato";
 import { createClient } from "@/lib/supabase/server";
 import type { Pedido } from "@/types/database";
@@ -53,12 +54,7 @@ export default async function PaginaPedidos() {
               : `${pedidos.length} pedido${pedidos.length > 1 ? "s" : ""}, ${moeda(aReceber)} a receber.`}
           </p>
         </div>
-        <Link
-          href="/vender"
-          className="inline-flex h-11 items-center rounded-lg bg-marca px-4 text-sm font-medium text-white transition-colors hover:bg-marca-escura"
-        >
-          Novo pedido
-        </Link>
+        <LinkBotao href="/vender">Novo pedido</LinkBotao>
       </header>
 
       {pedidos.length === 0 ? (

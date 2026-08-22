@@ -3,17 +3,16 @@
 import { useActionState } from "react";
 
 import { redefinirSenha, type EstadoFormulario } from "../actions";
-import { Alerta } from "@/components/ui/alerta";
+import { useAviso } from "@/components/ui/avisos";
 import { Botao } from "@/components/ui/botao";
 import { Campo } from "@/components/ui/campo";
 
 export function FormularioRedefinirSenha() {
   const [estado, acao] = useActionState<EstadoFormulario, FormData>(redefinirSenha, {});
+  useAviso(estado);
 
   return (
     <form action={acao} className="flex flex-col gap-4">
-      {estado.erro ? <Alerta tom="erro">{estado.erro}</Alerta> : null}
-
       <Campo
         rotulo="Nova senha"
         name="senha"
@@ -33,7 +32,7 @@ export function FormularioRedefinirSenha() {
         minLength={8}
       />
 
-      <Botao type="submit" carregandoTexto="Salvando...">
+      <Botao type="submit" carregandoTexto="Salvando..." larguraTotal>
         Salvar nova senha
       </Botao>
     </form>

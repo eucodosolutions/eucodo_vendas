@@ -57,7 +57,15 @@ export async function entrar(
   });
 
   if (error || !data.user) {
-    return { erro: "E-mail ou senha nao conferem." };
+    // Credencial errada e servidor fora do ar viram a mesma tela generica com
+    // facilidade, e ai a pessoa fica tentando trocar a senha quando o problema
+    // e configuracao.
+    const falhaDeRede = error?.name === "AuthRetryableFetchError" || error?.status === 0;
+    return {
+      erro: falhaDeRede
+        ? "Nao consegui falar com o servidor. Confira a configuracao do Supabase."
+        : "E-mail ou senha nao conferem.",
+    };
   }
 
   // O cadastro e aberto, o acesso nao. Conta nova espera liberacao de um admin.

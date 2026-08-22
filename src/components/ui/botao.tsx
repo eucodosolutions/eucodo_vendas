@@ -3,9 +3,12 @@
 import { useFormStatus } from "react-dom";
 import type { ButtonHTMLAttributes } from "react";
 
-type BotaoProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variante?: "primario" | "secundario" | "fantasma";
+import { ALTURA_CONTROLE, juntar } from "./controle";
+
+type BotaoProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className"> & {
+  variante?: "primario" | "secundario" | "fantasma" | "sucesso";
   carregandoTexto?: string;
+  larguraTotal?: boolean;
 };
 
 const ESTILOS = {
@@ -13,18 +16,18 @@ const ESTILOS = {
   secundario:
     "bg-superficie text-tinta border border-borda-forte hover:border-tinta-suave disabled:opacity-50",
   fantasma: "bg-transparent text-marca hover:bg-marca-suave disabled:opacity-50",
+  sucesso: "bg-sucesso text-white hover:opacity-90 disabled:opacity-50",
 } as const;
 
 /**
- * Botao de formulario. Quando esta dentro de um <form> com server action, ele
- * mesmo escuta o envio e trava o duplo clique, que num painel de vendas
- * significaria pedido duplicado.
+ * Botao de formulario. Dentro de um <form> com server action ele mesmo escuta o
+ * envio e trava o duplo clique, que num painel de vendas seria pedido dobrado.
  */
 export function Botao({
   variante = "primario",
   carregandoTexto,
+  larguraTotal,
   children,
-  className = "",
   disabled,
   ...props
 }: BotaoProps) {
@@ -35,7 +38,12 @@ export function Botao({
     <button
       {...props}
       disabled={travado}
-      className={`inline-flex h-12 items-center justify-center gap-2 rounded-lg px-5 text-base font-medium transition-colors disabled:cursor-not-allowed ${ESTILOS[variante]} ${className}`}
+      className={juntar(
+        ALTURA_CONTROLE,
+        "inline-flex items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium whitespace-nowrap transition-colors disabled:cursor-not-allowed",
+        ESTILOS[variante],
+        larguraTotal && "w-full",
+      )}
     >
       {travado && carregandoTexto ? carregandoTexto : children}
     </button>

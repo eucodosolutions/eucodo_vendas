@@ -4,18 +4,17 @@ import Link from "next/link";
 import { useActionState } from "react";
 
 import { entrar, type EstadoFormulario } from "../actions";
-import { Alerta } from "@/components/ui/alerta";
+import { useAviso } from "@/components/ui/avisos";
 import { Botao } from "@/components/ui/botao";
 import { Campo } from "@/components/ui/campo";
 
 export function FormularioEntrar({ proxima }: { proxima?: string }) {
   const [estado, acao] = useActionState<EstadoFormulario, FormData>(entrar, {});
+  useAviso(estado);
 
   return (
     <form action={acao} className="flex flex-col gap-4">
       {proxima ? <input type="hidden" name="proxima" value={proxima} /> : null}
-
-      {estado.erro ? <Alerta tom="erro">{estado.erro}</Alerta> : null}
 
       <Campo
         rotulo="E-mail"
@@ -28,7 +27,7 @@ export function FormularioEntrar({ proxima }: { proxima?: string }) {
       />
       <Campo rotulo="Senha" name="senha" type="password" autoComplete="current-password" required />
 
-      <Botao type="submit" carregandoTexto="Entrando...">
+      <Botao type="submit" carregandoTexto="Entrando..." larguraTotal>
         Entrar
       </Botao>
 

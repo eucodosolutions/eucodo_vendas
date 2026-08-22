@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LinkBotao } from "@/components/ui/link-botao";
 
 export default function NaoEncontrado() {
   return (
@@ -14,18 +14,10 @@ export default function NaoEncontrado() {
         digitacao.
       </p>
       <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-        <Link
-          href="/vender"
-          className="inline-flex h-12 items-center justify-center rounded-lg bg-marca px-5 text-base font-medium text-white transition-colors hover:bg-marca-escura"
-        >
-          Ir para a venda rapida
-        </Link>
-        <Link
-          href="/pedidos"
-          className="inline-flex h-12 items-center justify-center rounded-lg border border-borda-forte bg-superficie px-5 text-base font-medium text-tinta transition-colors hover:border-tinta-suave"
-        >
+        <LinkBotao href="/vender">Ir para a venda rapida</LinkBotao>
+        <LinkBotao href="/pedidos" variante="secundario">
           Ver pedidos
-        </Link>
+        </LinkBotao>
       </div>
     </main>
   );

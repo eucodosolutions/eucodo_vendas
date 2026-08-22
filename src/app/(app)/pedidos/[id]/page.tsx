@@ -3,7 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AcoesDoPedido } from "./acoes-do-pedido";
+import { AvisoDeChegada } from "./aviso-de-chegada";
 import { EtiquetaPagamento, EtiquetaStatus } from "@/components/etiquetas";
+import { LinkBotao } from "@/components/ui/link-botao";
+import { Dado, Secao } from "@/components/ui/secao";
 import {
   dataHora,
   moeda,
@@ -25,11 +28,7 @@ export default async function PaginaPedido({ params, searchParams }: PageProps<"
 
   const supabase = await createClient();
 
-  const { data: pedido } = await supabase
-    .from("pedidos")
-    .select("*")
-    .eq("id", id)
-    .single<Pedido>();
+  const { data: pedido } = await supabase.from("pedidos").select("*").eq("id", id).single<Pedido>();
 
   if (!pedido) notFound();
 
@@ -54,25 +53,12 @@ export default async function PaginaPedido({ params, searchParams }: PageProps<"
     : null;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <Link href="/pedidos" className="text-sm font-medium text-marca hover:underline">
-          Voltar para os pedidos
-        </Link>
-      </div>
+    <div className="flex flex-col gap-5">
+      {novo ? <AvisoDeChegada envio={typeof envio === "string" ? envio : undefined} /> : null}
 
-      {novo ? (
-        envio === "link" ? (
-          <p className="rounded-lg bg-atencao-suave px-4 py-3 text-sm font-medium text-atencao">
-            Pedido criado e arte gerada. Nao ha instancia de WhatsApp conectada, entao use
-            &quot;Mandar a arte no WhatsApp&quot; abaixo para abrir a conversa com o texto pronto.
-          </p>
-        ) : (
-          <p className="rounded-lg bg-sucesso-suave px-4 py-3 text-sm font-medium text-sucesso">
-            Pedido criado, arte gerada e mensagem enviada para o cliente.
-          </p>
-        )
-      ) : null}
+      <Link href="/pedidos" className="text-sm font-medium text-marca hover:underline">
+        Voltar para os pedidos
+      </Link>
 
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -94,38 +80,33 @@ export default async function PaginaPedido({ params, searchParams }: PageProps<"
         </p>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-        <section className="flex flex-col gap-3 rounded-card border border-borda bg-superficie p-5">
-          <h2 className="text-sm font-semibold tracking-wide text-tinta-suave uppercase">Arte</h2>
-          {previa ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={previa}
-                alt={`Arte do display de ${pedido.nome_negocio}`}
-                className="w-full rounded-lg border border-borda"
-              />
-              {download ? (
-                <a
-                  href={download}
-                  className="inline-flex h-11 items-center justify-center rounded-lg bg-marca px-4 text-sm font-medium text-white transition-colors hover:bg-marca-escura"
-                >
-                  Baixar JPG para impressao
-                </a>
-              ) : null}
-            </>
-          ) : (
-            <p className="text-sm text-tinta-suave">
-              A arte ainda nao foi gerada para este pedido. Use o botao de gerar a arte abaixo.
-            </p>
-          )}
-        </section>
+      <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
+        <Secao titulo="Arte">
+          <div className="flex flex-col gap-3">
+            {previa ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previa}
+                  alt={`Arte do display de ${pedido.nome_negocio}`}
+                  className="w-full rounded-lg border border-borda"
+                />
+                {download ? (
+                  <LinkBotao href={download} externo>
+                    Baixar JPG para impressao
+                  </LinkBotao>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-sm text-tinta-suave">
+                A arte ainda nao foi gerada para este pedido. Use &quot;Gerar a arte&quot; ao lado.
+              </p>
+            )}
+          </div>
+        </Secao>
 
-        <div className="flex flex-col gap-6">
-          <section className="rounded-card border border-borda bg-superficie p-5">
-            <h2 className="mb-3 text-sm font-semibold tracking-wide text-tinta-suave uppercase">
-              Dados do pedido
-            </h2>
+        <div className="flex flex-col gap-5">
+          <Secao titulo="Dados do pedido">
             <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
               <Dado rotulo="WhatsApp" valor={whatsappLegivel(pedido.whatsapp)} />
               <Dado
@@ -143,19 +124,19 @@ export default async function PaginaPedido({ params, searchParams }: PageProps<"
                 }
               />
               <div className="sm:col-span-2">
-                <dt className="text-xs font-medium tracking-wide text-tinta-suave uppercase">
-                  Link de avaliacao
-                </dt>
-                <dd className="mt-0.5 text-sm break-all text-tinta">
-                  <a
-                    href={pedido.link_avaliacao}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="text-marca hover:underline"
-                  >
-                    {pedido.link_avaliacao}
-                  </a>
-                </dd>
+                <Dado
+                  rotulo="Link de avaliacao"
+                  valor={
+                    <a
+                      href={pedido.link_avaliacao}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="break-all text-marca hover:underline"
+                    >
+                      {pedido.link_avaliacao}
+                    </a>
+                  }
+                />
               </div>
               {pedido.observacoes ? (
                 <div className="sm:col-span-2">
@@ -168,7 +149,7 @@ export default async function PaginaPedido({ params, searchParams }: PageProps<"
                 </div>
               ) : null}
             </dl>
-          </section>
+          </Secao>
 
           <AcoesDoPedido
             pedidoId={pedido.id}
@@ -177,10 +158,7 @@ export default async function PaginaPedido({ params, searchParams }: PageProps<"
             temArte={Boolean(pedido.arte_jpg_path)}
           />
 
-          <section className="rounded-card border border-borda bg-superficie p-5">
-            <h2 className="mb-3 text-sm font-semibold tracking-wide text-tinta-suave uppercase">
-              Historico
-            </h2>
+          <Secao titulo="Historico">
             <ol className="flex flex-col gap-3">
               {(eventos ?? []).map((evento) => (
                 <li key={evento.id} className="flex gap-3 text-sm">
@@ -197,18 +175,9 @@ export default async function PaginaPedido({ params, searchParams }: PageProps<"
                 <li className="text-sm text-tinta-suave">Sem movimentacoes ainda.</li>
               ) : null}
             </ol>
-          </section>
+          </Secao>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Dado({ rotulo, valor }: { rotulo: string; valor: string }) {
-  return (
-    <div>
-      <dt className="text-xs font-medium tracking-wide text-tinta-suave uppercase">{rotulo}</dt>
-      <dd className="mt-0.5 text-sm text-tinta">{valor}</dd>
     </div>
   );
 }

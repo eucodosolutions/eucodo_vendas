@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { VendaRapida, type TamanhoComVariantes } from "./venda-rapida";
+import { Secao } from "@/components/ui/secao";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Venda rapida" };
@@ -24,12 +25,12 @@ export default async function PaginaVender() {
 
   if (tamanhos.length === 0) {
     return (
-      <div className="rounded-card border border-borda bg-superficie p-6">
+      <Secao>
         <h1 className="text-lg font-semibold tracking-tight text-tinta">Nenhum modelo cadastrado</h1>
         <p className="mt-2 text-sm text-tinta-suave">
           Cadastre pelo menos um tamanho com preco em Ajustes para comecar a vender.
         </p>
-      </div>
+      </Secao>
     );
   }
 

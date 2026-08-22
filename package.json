@@ -16,12 +16,14 @@
     "@resvg/resvg-js": "^2.6.2",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.3",
+    "lucide-react": "^1.33.0",
     "next": "^16.3.2",
     "qrcode": "^1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1",
     "sharp": "^0.35.3",
+    "sonner": "^2.0.8",
     "zod": "^4.4.3"
   },
   "devDependencies": {
