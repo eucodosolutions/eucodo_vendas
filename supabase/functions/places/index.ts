@@ -53,6 +53,36 @@ type LugarDoGoogle = {
   googleMapsLinks?: { writeAReviewUri?: string };
 };
 
+/**
+ * Traduz a recusa do Google para o que precisa ser feito no console.
+ *
+ * As tres primeiras sao erros de configuracao, e o vendedor nao consegue nada
+ * repetindo a busca: quem resolve e quem administra o projeto no Google.
+ */
+function recado(status: number, detalhe: string): string {
+  const codigo = (() => {
+    try {
+      return String((JSON.parse(detalhe) as { error?: { status?: string } }).error?.status ?? "");
+    } catch {
+      return "";
+    }
+  })();
+
+  if (codigo === "SERVICE_DISABLED" || detalhe.includes("has not been used in project")) {
+    return "A Places API (New) não está habilitada no projeto do Google.";
+  }
+
+  if (status === 403) {
+    return "O Google recusou a chave. Confira se ela está liberada para a Places API (New).";
+  }
+
+  if (status === 429) {
+    return "A cota da busca do Google acabou por hoje.";
+  }
+
+  return `O Google recusou a busca (${status}${codigo ? ` ${codigo}` : ""}).`;
+}
+
 Deno.serve(async (requisicao) => {
   if (requisicao.method === "OPTIONS") {
     return new Response("ok", { headers: CABECALHOS_CORS });
@@ -124,10 +154,14 @@ Deno.serve(async (requisicao) => {
   }
 
   if (!resposta.ok) {
-    // O detalhe do Google fica no log da funcao: mensagem de cota estourada ou
-    // de chave invalida e assunto de quem administra, nao do vendedor.
-    console.error("places:", resposta.status, await resposta.text());
-    return responder({ erro: "A busca do Google falhou. Tente de novo." }, 502);
+    const detalhe = await resposta.text();
+    console.error("places:", resposta.status, detalhe);
+
+    // O texto cru do Google fica no log, mas o codigo dele sobe ate a tela. Sem
+    // isso, chave restrita, API legada habilitada no lugar da nova e cota
+    // estourada chegam identicas em quem esta vendendo — e nenhuma das tres se
+    // resolve tentando de novo, que e o que "falhou, tente de novo" sugere.
+    return responder({ erro: recado(resposta.status, detalhe) }, 502);
   }
 
   const dados = (await resposta.json()) as { places?: LugarDoGoogle[] };

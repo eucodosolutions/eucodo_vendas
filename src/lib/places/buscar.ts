@@ -32,9 +32,35 @@ export async function buscarNegocio(busca: string): Promise<ResultadoDaBusca> {
     body: { busca: termo },
   });
 
-  if (error || !data) {
-    return { negocios: [], erro: "Não consegui buscar no Google agora." };
-  }
+  if (error) return { negocios: [], erro: await motivo(error) };
+  if (!data) return { negocios: [], erro: PADRAO };
 
   return { negocios: data.negocios ?? [], erro: data.erro };
+}
+
+const PADRAO = "Não consegui buscar no Google agora.";
+
+/**
+ * Tira da falha o que a funcao tem a dizer.
+ *
+ * `functions.invoke` transforma qualquer resposta fora do 2xx em erro e guarda
+ * a resposta original no `context`. Sem abrir esse envelope, "conta sem acesso",
+ * "chave nao configurada" e "o Google recusou" chegam na tela como a mesma
+ * frase — e a primeira versao disto fez exatamente isso, o que custou uma
+ * investigacao inteira para descobrir de qual dos tres se tratava.
+ */
+async function motivo(error: unknown): Promise<string> {
+  const resposta = (error as { context?: unknown }).context;
+  if (!(resposta instanceof Response)) return PADRAO;
+
+  // O terminal de quem esta desenvolvendo merece o status; a tela do vendedor,
+  // so a frase.
+  try {
+    const corpo = (await resposta.clone().json()) as { erro?: unknown };
+    console.error("places:", resposta.status, corpo);
+    return typeof corpo.erro === "string" ? corpo.erro : PADRAO;
+  } catch {
+    console.error("places:", resposta.status, await resposta.clone().text());
+    return PADRAO;
+  }
 }
