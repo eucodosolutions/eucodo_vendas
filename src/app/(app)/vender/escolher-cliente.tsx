@@ -6,13 +6,16 @@ import { useMemo, useState } from "react";
 import { ModalCliente, type ClienteGravado } from "../clientes/modal-cliente";
 import { Botao } from "@/components/ui/botao";
 import { CampoDeBusca } from "@/components/ui/campo-de-busca";
-import { Secao } from "@/components/ui/secao";
 import { whatsappLegivel } from "@/lib/formato";
 
 export type ClienteDaLista = { id: string; nome: string; whatsapp: string };
 
 /**
  * O passo do fecho: para quem e este pedido.
+ *
+ * Sai sem moldura porque hoje ele mora dentro do popup de fechamento, que ja
+ * tem a sua. Era uma secao de pagina inteira quando o fecho acontecia solto
+ * no meio da tela de venda.
  *
  * A lista inteira da conta vem do servidor e o filtro roda aqui, sem ida e
  * volta: com o cliente na frente, esperar a rede para achar um nome que ja
@@ -70,7 +73,7 @@ export function EscolherCliente({
 
   if (escolhido) {
     return (
-      <Secao titulo="Cliente do pedido">
+      <div className="rounded-lg border border-borda bg-papel p-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-base font-medium text-tinta">{escolhido.nome}</p>
@@ -82,12 +85,12 @@ export function EscolherCliente({
             Trocar cliente
           </Botao>
         </div>
-      </Secao>
+      </div>
     );
   }
 
   return (
-    <Secao titulo="Cliente do pedido">
+    <>
       <div className="flex flex-col gap-3">
         <CampoDeBusca
           rotulo="Buscar cliente"
@@ -136,6 +139,6 @@ export function EscolherCliente({
         aoFechar={fecharCadastro}
         aoSalvar={aoCadastrar}
       />
-    </Secao>
+    </>
   );
 }

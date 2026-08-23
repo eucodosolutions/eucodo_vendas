@@ -5,12 +5,19 @@ import { z } from "zod";
 
 import { renderPreviewPng, renderPrintJpg } from "@/lib/art/render";
 import { specDoProduto } from "@/lib/art/spec";
-import { CORES } from "@/lib/catalogo";
+import { CORES, detalheDaPlaca } from "@/lib/catalogo";
 import { validarLinkAvaliacao } from "@/lib/formato";
+import { pixCopiaECola } from "@/lib/pix";
 import { sessaoDoPainel } from "@/lib/supabase/painel";
 import { createClient } from "@/lib/supabase/server";
-import { enviarWhatsapp } from "@/lib/whatsapp/enviar";
-import type { CorArte, ProdutoAvaliacao, TecnologiaArte } from "@/types/database";
+import { enviarWhatsapp, type ChaveMensagem } from "@/lib/whatsapp/enviar";
+import type {
+  CorArte,
+  FormaCombinada,
+  MomentoPagamento,
+  ProdutoAvaliacao,
+  TecnologiaArte,
+} from "@/types/database";
 
 export type EstadoVenda = { erro?: string };
 
@@ -25,12 +32,16 @@ export type ItemParaPedido = {
 
 export type PedidoDoCarrinho = {
   clienteId: string;
+  forma: FormaCombinada;
+  momento: MomentoPagamento;
   observacoes?: string;
   itens: ItemParaPedido[];
 };
 
 const esquema = z.object({
   clienteId: z.string().uuid("Escolha o cliente do pedido."),
+  forma: z.enum(["pix", "dinheiro"], "Escolha a forma de pagamento."),
+  momento: z.enum(["agora", "na_entrega"], "Diga se o cliente paga agora ou na entrega."),
   observacoes: z.string().trim().max(500).optional(),
   itens: z
     .array(
@@ -85,7 +96,7 @@ export async function criarPedido(
     return { erro: resultado.error.issues[0]?.message ?? "Confira os itens do pedido." };
   }
 
-  const { clienteId, observacoes, itens } = resultado.data;
+  const { clienteId, forma, momento, observacoes, itens } = resultado.data;
 
   const sessao = await sessaoDoPainel();
   if (!sessao?.perfil.assinatura_id) return { erro: "Sessão expirada. Entre de novo." };
@@ -96,7 +107,7 @@ export async function criarPedido(
   const { data: catalogo } = await supabase
     .from("produtos")
     .select(
-      "id, tipo, nome, preco_centavos, prazo_entrega_dias, produto_avaliacao (largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi, cores, tecnologia)",
+      `id, tipo, nome, preco_centavos, prazo_entrega_dias, ${detalheDaPlaca("largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi, cores, tecnologia")}`,
     )
     .in(
       "id",
@@ -155,6 +166,8 @@ export async function criarPedido(
       cliente_id: clienteId,
       criado_por: sessao.perfil.id,
       origem: "painel",
+      forma_combinada: forma,
+      momento_pagamento: momento,
       observacoes: observacoes || null,
     })
     .select("id, codigo")
@@ -223,20 +236,79 @@ export async function criarPedido(
       }),
   );
 
+  // O PIX so pode ser montado agora: quem soma o pedido e o gatilho que roda no
+  // insert dos itens, e um BR Code com o total zerado nao cobra nada.
+  const chaveDaMensagem = await prepararCobranca({
+    supabase,
+    pedidoId: pedido.id,
+    codigo: pedido.codigo,
+    cobrarAgora: forma === "pix" && momento === "agora",
+  });
+
   await supabase.from("pedido_eventos").insert({
     pedido_id: pedido.id,
     tipo: "criado",
     de: null,
     para: "novo",
-    detalhe: `Pedido aberto no painel por ${sessao.perfil.nome} para ${cliente.nome}`,
+    detalhe: `Pedido aberto no painel por ${sessao.perfil.nome} para ${cliente.nome}. Combinado: ${forma === "pix" ? "PIX" : "dinheiro"}, ${momento === "agora" ? "paga agora" : "paga na entrega"}.`,
     autor_id: sessao.perfil.id,
   });
 
   // A arte sai junto da mensagem. Se nao houver instancia conectada, a pagina
   // do pedido mostra o botao que abre o WhatsApp com o texto pronto.
-  const envio = await enviarWhatsapp(pedido.id, "pedido_criado");
+  const envio = await enviarWhatsapp(pedido.id, chaveDaMensagem);
 
   redirect(`/pedidos/${pedido.id}?novo=1&envio=${envio.enviado ? "ok" : "link"}`);
+}
+
+/**
+ * Monta o PIX copia e cola do pedido e diz qual mensagem mandar.
+ *
+ * So gera quando o combinado foi PIX a vista. Falta de chave PIX na conta nao
+ * derruba nada: o pedido ja esta fechado, e mandar a mensagem sem a cobranca e
+ * muito melhor do que perder a venda porque o assinante nao preencheu Ajustes.
+ * Quem avisa disso e a propria tela de fechamento, antes de confirmar.
+ */
+async function prepararCobranca({
+  supabase,
+  pedidoId,
+  codigo,
+  cobrarAgora,
+}: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  pedidoId: string;
+  codigo: string;
+  cobrarAgora: boolean;
+}): Promise<ChaveMensagem> {
+  if (!cobrarAgora) return "pedido_criado";
+
+  // Pela funcao, e nao pela tabela: `configuracoes` so abre para o assinante, e
+  // quem mais fecha pedido e o vendedor.
+  const [{ data: pix }, { data: pedido }] = await Promise.all([
+    supabase.rpc("pix_da_conta").maybeSingle(),
+    supabase.from("pedidos").select("total_centavos").eq("id", pedidoId).single(),
+  ]);
+
+  const codigoPix = pixCopiaECola(
+    {
+      chave: pix?.pix_chave ?? undefined,
+      beneficiario: pix?.pix_beneficiario ?? undefined,
+      cidade: pix?.pix_cidade ?? undefined,
+    },
+    pedido?.total_centavos ?? 0,
+    codigo,
+  );
+
+  if (!codigoPix) return "pedido_criado";
+
+  const { error } = await supabase
+    .from("pedidos")
+    .update({ pix_copia_e_cola: codigoPix })
+    .eq("id", pedidoId);
+
+  // A mensagem le o codigo da coluna. Se a gravacao falhou, a coluna esta vazia
+  // e o modelo do PIX sairia com o lugar da cobranca em branco.
+  return error ? "pedido_criado" : "pedido_criado_pix";
 }
 
 type EntradaArte = {

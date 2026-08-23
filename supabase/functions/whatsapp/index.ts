@@ -84,7 +84,7 @@ Deno.serve(async (requisicao) => {
   const { data: pedido } = await supabase
     .from("pedidos")
     .select(
-      "id, codigo, assinatura_id, total_centavos, prazo_entrega_dias, clientes (nome, whatsapp), pedido_itens (ordem, nome_negocio, produto_nome, cor, tecnologia, quantidade, total_centavos, arte_preview_path)",
+      "id, codigo, assinatura_id, total_centavos, prazo_entrega_dias, pix_copia_e_cola, clientes (nome, whatsapp), pedido_itens (ordem, nome_negocio, produto_nome, cor, tecnologia, quantidade, total_centavos, arte_preview_path)",
     )
     .eq("id", corpo.pedidoId)
     .single();
@@ -344,6 +344,10 @@ async function montarTexto(
     quantidade: String(itens.reduce((soma, item) => soma + item.quantidade, 0)),
     total: formatarMoeda(pedido.total_centavos),
     prazo: prazoLegivel(pedido.prazo_entrega_dias),
+    // Montado no fechamento e gravado no pedido, e nao remontado aqui: o codigo
+    // carrega o total e o numero daquele pedido, e a chave PIX da conta pode
+    // ter mudado desde entao. So o modelo `pedido_criado_pix` le esta chave.
+    pix: pedido.pix_copia_e_cola ?? "",
   };
 
   return modelo.corpo.replace(

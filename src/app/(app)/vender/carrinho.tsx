@@ -1,77 +1,68 @@
 "use client";
 
-import { Minus, Plus, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
-import { Secao } from "@/components/ui/secao";
+import { Quantidade } from "./quantidade";
 import { moeda, ROTULO_COR } from "@/lib/formato";
-import { pecasDoCarrinho, totalDoCarrinho, type ItemDoCarrinho } from "@/lib/carrinho/carrinho";
+import type { ItemDoCarrinho } from "@/lib/carrinho/carrinho";
 
-export function Carrinho({
+/**
+ * A lista de itens do carrinho, sem moldura.
+ *
+ * A moldura fica com quem a usa: hoje e a gaveta, e o resumo do fechamento
+ * mostra a mesma lista sem os controles. Por isso `somenteLeitura`, e nao dois
+ * componentes que precisariam ser corrigidos em dobro.
+ */
+export function ListaDoCarrinho({
   itens,
   aoRemover,
   aoMudarQuantidade,
+  somenteLeitura,
 }: {
   itens: ItemDoCarrinho[];
-  aoRemover: (chave: string) => void;
-  aoMudarQuantidade: (chave: string, quantidade: number) => void;
+  aoRemover?: (chave: string) => void;
+  aoMudarQuantidade?: (chave: string, quantidade: number) => void;
+  somenteLeitura?: boolean;
 }) {
-  const total = totalDoCarrinho(itens);
-  const pecas = pecasDoCarrinho(itens);
-
   return (
-    <Secao titulo={`Carrinho, ${pecas} ${pecas === 1 ? "peça" : "peças"}`}>
-      <ul className="flex flex-col divide-y divide-borda">
-        {itens.map((item) => (
-          <li key={item.chave} className="flex flex-wrap items-center gap-3 py-3 first:pt-0">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-base font-medium text-tinta">{titulo(item)}</p>
-              <p className="text-sm text-tinta-suave">{detalhe(item)}</p>
+    <ul className="flex flex-col divide-y divide-borda">
+      {itens.map((item) => (
+        <li key={item.chave} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-tinta">{titulo(item)}</p>
+              <p className="text-xs text-tinta-suave">{detalhe(item)}</p>
             </div>
-
-            <div className="flex items-center gap-1">
-              <BotaoDeQuantidade
-                rotulo={`Menos um de ${titulo(item)}`}
-                disabled={item.quantidade <= 1}
-                onClick={() => aoMudarQuantidade(item.chave, item.quantidade - 1)}
-              >
-                <Minus size={15} aria-hidden />
-              </BotaoDeQuantidade>
-
-              <span className="w-8 text-center text-sm font-medium text-tinta tabular-nums">
-                {item.quantidade}
-              </span>
-
-              <BotaoDeQuantidade
-                rotulo={`Mais um de ${titulo(item)}`}
-                onClick={() => aoMudarQuantidade(item.chave, item.quantidade + 1)}
-              >
-                <Plus size={15} aria-hidden />
-              </BotaoDeQuantidade>
-            </div>
-
-            <span className="w-24 shrink-0 text-right text-base font-semibold text-tinta tabular-nums">
+            <span className="shrink-0 text-sm font-semibold text-tinta tabular-nums">
               {moeda(item.precoUnitarioCentavos * item.quantidade)}
             </span>
+          </div>
 
-            <button
-              type="button"
-              onClick={() => aoRemover(item.chave)}
-              aria-label={`Remover ${titulo(item)} do carrinho`}
-              className="flex size-9 items-center justify-center rounded-lg text-tinta-suave transition-colors hover:bg-papel hover:text-erro"
-            >
-              <Trash2 size={16} aria-hidden />
-            </button>
-          </li>
-        ))}
-      </ul>
+          {somenteLeitura ? (
+            <span className="text-xs text-tinta-suave tabular-nums">
+              {item.quantidade} {item.quantidade === 1 ? "unidade" : "unidades"}
+            </span>
+          ) : (
+            <div className="flex items-center justify-between gap-3">
+              <Quantidade
+                valor={item.quantidade}
+                aoMudar={(quantidade) => aoMudarQuantidade?.(item.chave, quantidade)}
+                descricao={titulo(item)}
+              />
 
-      <div className="mt-4 flex items-end justify-between border-t border-borda pt-4">
-        <span className="text-xs font-medium tracking-wide text-tinta-suave uppercase">
-          Total do pedido
-        </span>
-        <span className="text-2xl font-semibold tracking-tight text-tinta">{moeda(total)}</span>
-      </div>
-    </Secao>
+              <button
+                type="button"
+                onClick={() => aoRemover?.(item.chave)}
+                aria-label={`Remover ${titulo(item)} do carrinho`}
+                className="flex size-9 items-center justify-center rounded-lg text-tinta-suave transition-colors hover:bg-papel hover:text-erro"
+              >
+                <Trash2 size={16} aria-hidden />
+              </button>
+            </div>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -97,28 +88,4 @@ function detalhe(item: ItemDoCarrinho): string {
 
   const cada = `${moeda(item.precoUnitarioCentavos)} cada`;
   return configuracao ? `${configuracao} | ${cada}` : cada;
-}
-
-function BotaoDeQuantidade({
-  rotulo,
-  disabled,
-  onClick,
-  children,
-}: {
-  rotulo: string;
-  disabled?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={rotulo}
-      disabled={disabled}
-      onClick={onClick}
-      className="flex size-9 items-center justify-center rounded-lg border border-borda text-tinta-media transition-colors hover:border-borda-forte disabled:opacity-40"
-    >
-      {children}
-    </button>
-  );
 }

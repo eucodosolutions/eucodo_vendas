@@ -20,6 +20,21 @@ export type FormaPagamento =
   | "cartao_credito"
   | "cartao_debito"
   | "transferencia";
+export type MomentoPagamento = "agora" | "na_entrega";
+
+/** O que a funcao `pix_da_conta` devolve: os tres campos do PIX, e so eles. */
+export type PixDaConta = Pick<Configuracoes, "pix_chave" | "pix_beneficiario" | "pix_cidade">;
+
+/**
+ * O que a tela de venda oferece como forma combinada.
+ *
+ * E um recorte de `FormaPagamento`, e nao uma lista nova: cartao e
+ * transferencia continuam valendo na baixa manual do pedido, so nao aparecem no
+ * fechamento. Sendo um `Extract`, o dia em que o enum do banco mudar leva este
+ * tipo junto, em vez de deixar duas listas divergirem em silencio.
+ */
+export type FormaCombinada = Extract<FormaPagamento, "pix" | "dinheiro">;
+
 export type OrigemPedido = "painel" | "publico";
 export type ViaMensagem = "uazapi" | "link";
 
@@ -112,6 +127,11 @@ export type Pedido = {
   pagamento: StatusPagamento;
   forma_pagamento: FormaPagamento | null;
   pago_em: string | null;
+  /** O que foi combinado no fechamento. Nao diz que o pedido esta pago. */
+  forma_combinada: FormaCombinada | null;
+  momento_pagamento: MomentoPagamento | null;
+  /** O BR Code mandado no WhatsApp. So existe em PIX a vista. */
+  pix_copia_e_cola: string | null;
   cancelado_em: string | null;
   motivo_cancelamento: string | null;
   /** O maior prazo entre os itens: e quando o pedido inteiro sai. */
@@ -274,6 +294,14 @@ export type Database = {
         Args: { p_instancia_id: string; p_token: string };
         Returns: undefined;
       };
+      /**
+       * O PIX da conta de quem chama, para o fechamento montar a cobranca.
+       *
+       * Existe porque `configuracoes` so abre para o assinante e quem mais
+       * fecha pedido e o vendedor. Devolve tabela, entao a resposta vem como
+       * lista de uma linha — use `.maybeSingle()`.
+       */
+      pix_da_conta: { Args: Record<string, never>; Returns: PixDaConta[] };
       // token_da_instancia so executa com a chave de servico, dentro da Edge
       // Function. Fica de fora daqui de proposito, para nao virar tentacao.
     };
@@ -286,6 +314,7 @@ export type Database = {
       status_pedido: StatusPedido;
       status_pagamento: StatusPagamento;
       forma_pagamento: FormaPagamento;
+      momento_pagamento: MomentoPagamento;
       origem_pedido: OrigemPedido;
       via_mensagem: ViaMensagem;
     };

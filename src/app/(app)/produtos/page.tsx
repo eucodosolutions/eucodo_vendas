@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { ListaDeProdutos } from "./lista-de-produtos";
 import type { ProdutoEditavel } from "./modal-produto";
+import { detalheDaPlaca } from "@/lib/catalogo";
 import { sessaoDoPainel } from "@/lib/supabase/painel";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,7 +22,7 @@ export default async function PaginaProdutos() {
   const { data: produtos } = await supabase
     .from("produtos")
     .select(
-      "id, tipo, nome, descricao, foto_path, preco_centavos, comissao_percentual, prazo_entrega_dias, ativo, produto_avaliacao (largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi, cores, tecnologia)",
+      `id, tipo, nome, descricao, foto_path, preco_centavos, comissao_percentual, prazo_entrega_dias, ativo, ${detalheDaPlaca("largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi, cores, tecnologia")}`,
     )
     .order("ordem")
     .order("nome")

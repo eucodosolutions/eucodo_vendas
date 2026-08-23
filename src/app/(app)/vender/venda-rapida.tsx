@@ -1,18 +1,18 @@
 "use client";
 
 import { ShoppingCart } from "lucide-react";
-import { useMemo, useRef, useState, useActionState } from "react";
+import { useState, useActionState } from "react";
 
 import { criarPedido, type EstadoVenda, type PedidoDoCarrinho } from "./actions";
-import { Carrinho } from "./carrinho";
-import { EscolherCliente, type ClienteDaLista } from "./escolher-cliente";
+import { CartaoDeProduto } from "./cartao-de-produto";
+import type { ClienteDaLista } from "./escolher-cliente";
+import { GavetaDoCarrinho } from "./gaveta-do-carrinho";
+import { ModalFechamento } from "./modal-fechamento";
+import { ModalItem } from "./modal-item";
 import { avisar, useAviso } from "@/components/ui/avisos";
-import { Botao } from "@/components/ui/botao";
-import { Campo } from "@/components/ui/campo";
-import { Escolha } from "@/components/ui/escolha";
-import { Secao } from "@/components/ui/secao";
 import { useCarrinho } from "@/lib/carrinho/usar-carrinho";
-import { moeda, ROTULO_COR, ROTULO_TECNOLOGIA } from "@/lib/formato";
+import { pecasDoCarrinho, totalDoCarrinho } from "@/lib/carrinho/carrinho";
+import { moeda } from "@/lib/formato";
 import type { CorArte, TecnologiaArte, TipoProduto } from "@/types/database";
 
 export type ProdutoDaVenda = {
@@ -31,271 +31,125 @@ export type ProdutoDaVenda = {
   } | null;
 };
 
+/**
+ * A vitrine: os produtos em grade, e o carrinho numa gaveta.
+ *
+ * Antes esta tela era um formulario so, com todos os campos de todos os passos
+ * abertos ao mesmo tempo. Funcionava com um produto no catalogo e virou uma
+ * parede de campos com quatro. Agora cada passo aparece quando chega a vez
+ * dele: escolher na grade, completar no popup, conferir na gaveta, fechar.
+ */
 export function VendaRapida({
   produtos,
   clientes,
+  pixConfigurado,
 }: {
   produtos: ProdutoDaVenda[];
   clientes: ClienteDaLista[];
+  pixConfigurado: boolean;
 }) {
-  const [estado, fechar, fechando] = useActionState<EstadoVenda, PedidoDoCarrinho>(
-    criarPedido,
-    {},
-  );
+  const [estado, fechar, fechando] = useActionState<EstadoVenda, PedidoDoCarrinho>(criarPedido, {});
   useAviso(estado);
 
   const carrinho = useCarrinho();
 
-  const [produtoId, setProdutoId] = useState(produtos[0].id);
-  const [cor, setCor] = useState<CorArte | null>(null);
-  const [quantidade, setQuantidade] = useState(1);
-  const [nomeNegocio, setNomeNegocio] = useState("");
-  const [linkAvaliacao, setLinkAvaliacao] = useState("");
-  const [cliente, setCliente] = useState<ClienteDaLista | null>(null);
-  const [observacoes, setObservacoes] = useState("");
+  const [produtoAberto, setProdutoAberto] = useState<ProdutoDaVenda | null>(null);
+  const [gavetaAberta, setGavetaAberta] = useState(false);
+  const [fechamentoAberto, setFechamentoAberto] = useState(false);
 
-  const campoDoNegocio = useRef<HTMLInputElement>(null);
+  const pecas = pecasDoCarrinho(carrinho.itens);
+  const temItens = pecas > 0;
 
-  const produto = produtos.find((item) => item.id === produtoId) ?? produtos[0];
-  const placa = produto.produto_avaliacao;
-
-  // A escolha do cliente so vale enquanto o produto oferecer aquela opcao. Sem
-  // isso, trocar de produto deixaria uma cor selecionada que ele nao vende.
-  const corEscolhida = useMemo(
-    () => (placa ? (cor && placa.cores.includes(cor) ? cor : placa.cores[0]) : null),
-    [placa, cor],
-  );
-
-  function adicionar() {
-    if (placa) {
-      if (nomeNegocio.trim().length < 2) {
-        avisar.atencao("Digite o nome do negócio que vai impresso nesta placa.");
-        campoDoNegocio.current?.focus();
-        return;
-      }
-
-      if (!linkAvaliacao.trim()) {
-        avisar.atencao("Cole o link de avaliação do Google deste negócio.");
-        return;
-      }
-    }
-
-    carrinho.adicionar({
-      produtoId: produto.id,
-      tipo: produto.tipo,
-      produtoNome: produto.nome,
-      precoUnitarioCentavos: produto.preco_centavos,
-      quantidade,
-      cor: corEscolhida ?? undefined,
-      nomeNegocio: placa ? nomeNegocio.trim() : undefined,
-      linkAvaliacao: placa ? linkAvaliacao.trim() : undefined,
-    });
-
-    // Limpa so o que muda de peca para peca. Produto e cor ficam, porque o caso
-    // comum e o mesmo modelo para duas empresas.
-    setNomeNegocio("");
-    setLinkAvaliacao("");
-    setQuantidade(1);
-    if (placa) campoDoNegocio.current?.focus();
-
-    avisar.sucesso("Item no carrinho. Adicione outro ou feche o pedido.");
+  function adicionar(item: Parameters<typeof carrinho.adicionar>[0]) {
+    carrinho.adicionar(item);
+    avisar.sucesso("Item no carrinho.");
   }
-
-  function fecharPedido() {
-    if (!cliente) {
-      avisar.atencao("Escolha para quem é este pedido.");
-      return;
-    }
-
-    fechar({
-      clienteId: cliente.id,
-      observacoes: observacoes.trim() || undefined,
-      itens: carrinho.itens.map((item) => ({
-        produtoId: item.produtoId,
-        quantidade: item.quantidade,
-        cor: item.cor,
-        nomeNegocio: item.nomeNegocio,
-        linkAvaliacao: item.linkAvaliacao,
-        placeId: item.placeId,
-      })),
-    });
-  }
-
-  const temItens = carrinho.itens.length > 0;
 
   return (
     <div className="flex flex-col gap-5">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-tinta">Venda rápida</h1>
-        <p className="mt-1 text-sm text-tinta-suave">
-          Monte o carrinho, escolha o cliente e feche o pedido.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-tinta">Vender</h1>
+          <p className="mt-1 text-sm text-tinta-suave">
+            Escolha o produto, complete o item e feche o pedido.
+          </p>
+        </div>
       </header>
 
-      {/* Este bloco e feito para ser virado para o cliente ver. */}
-      <Secao>
-        <div className="flex flex-col gap-5">
-          <Escolha
-            titulo="Produto"
-            opcoes={produtos.map((item) => ({
-              valor: item.id,
-              rotulo: item.nome,
-              detalhe: moeda(item.preco_centavos),
-            }))}
-            selecionado={produto.id}
-            aoSelecionar={setProdutoId}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {produtos.map((produto) => (
+          <CartaoDeProduto
+            key={produto.id}
+            produto={produto}
+            aoAdicionar={() => setProdutoAberto(produto)}
           />
+        ))}
+      </div>
 
-          {/* A tecnologia nao e escolha aqui: ela e o proprio produto, e cada
-              uma tem o seu preco. O que muda dentro do produto e so a cor. */}
-          {placa && placa.cores.length > 1 ? (
-            <Escolha
-              titulo="Arte"
-              opcoes={placa.cores.map((valor) => ({
-                valor,
-                rotulo: ROTULO_COR[valor],
-                detalhe: valor === "branco" ? "Fundo claro" : "Fundo escuro",
-              }))}
-              selecionado={corEscolhida!}
-              aoSelecionar={setCor}
-            />
-          ) : null}
-
-          {!placa ? <Vitrine produto={produto} /> : null}
-        </div>
-
-        <div className="mt-6 flex flex-wrap items-end justify-between gap-4 border-t border-borda pt-5">
-          <div>
-            <span className="text-xs font-medium tracking-wide text-tinta-suave uppercase">
-              {[
-                produto.nome,
-                corEscolhida ? ROTULO_COR[corEscolhida].toLowerCase() : null,
-                placa ? ROTULO_TECNOLOGIA[placa.tecnologia].toLowerCase() : null,
-              ]
-                .filter(Boolean)
-                .join(", ")}
-            </span>
-            <p className="mt-1 text-4xl font-semibold tracking-tight text-tinta">
-              {moeda(produto.preco_centavos)}
-            </p>
-            <p className="mt-1 text-sm text-tinta-suave">
-              Entrega em {produto.prazo_entrega_dias}{" "}
-              {produto.prazo_entrega_dias === 1 ? "dia" : "dias"}
-            </p>
-          </div>
-          <div className="w-24">
-            <Campo
-              rotulo="Quantidade"
-              name="quantidade"
-              placeholder="1"
-              type="number"
-              min={1}
-              max={999}
-              value={quantidade}
-              onChange={(evento) => setQuantidade(Math.max(1, Number(evento.target.value) || 1))}
-            />
-          </div>
-        </div>
-      </Secao>
-
-      {placa ? (
-        <Secao titulo="Para qual negócio é esta placa">
-          <div className="flex flex-col gap-4">
-            <Campo
-              ref={campoDoNegocio}
-              rotulo="Nome do negócio"
-              name="nomeNegocio"
-              placeholder="Barbearia Vintage"
-              autoComplete="off"
-              value={nomeNegocio}
-              onChange={(evento) => setNomeNegocio(evento.target.value)}
-              ajuda="É este nome que vai impresso no display, no lugar do logo do Google."
-            />
-
-            <Campo
-              rotulo="Link de avaliação do Google"
-              name="linkAvaliacao"
-              placeholder="https://g.page/r/.../review"
-              inputMode="url"
-              value={linkAvaliacao}
-              onChange={(evento) => setLinkAvaliacao(evento.target.value)}
-              ajuda="Aceita o link do g.page, o encurtado do Maps ou o endereço completo."
-            />
-
-            <div className="flex justify-end">
-              <Botao type="button" onClick={adicionar}>
-                <ShoppingCart size={16} aria-hidden />
-                Adicionar ao carrinho
-              </Botao>
-            </div>
-          </div>
-        </Secao>
-      ) : (
-        <div className="flex justify-end">
-          <Botao type="button" onClick={adicionar}>
-            <ShoppingCart size={16} aria-hidden />
-            Adicionar ao carrinho
-          </Botao>
-        </div>
-      )}
-
+      {/* Barra do carrinho presa no rodape, e nao um botao redondo solto: ela
+          mostra o total, que e o que o vendedor confere antes de fechar. Some
+          quando o carrinho esta vazio para nao cobrir a vitrine a toa. */}
       {temItens ? (
-        <>
-          <Carrinho
-            itens={carrinho.itens}
-            aoRemover={carrinho.remover}
-            aoMudarQuantidade={carrinho.mudarQuantidade}
-          />
-
-          <EscolherCliente clientes={clientes} escolhido={cliente} aoEscolher={setCliente} />
-
-          <Secao titulo="Fechar pedido">
-            <div className="flex flex-col gap-4">
-              <Campo
-                rotulo="Observações"
-                name="observacoes"
-                placeholder="Opcional, só para você"
-                value={observacoes}
-                onChange={(evento) => setObservacoes(evento.target.value)}
-              />
-
-              <div className="flex flex-wrap justify-between gap-3">
-                <Botao type="button" variante="secundario" onClick={carrinho.limpar}>
-                  Esvaziar carrinho
-                </Botao>
-                <Botao type="button" onClick={fecharPedido} disabled={!cliente || fechando}>
-                  {fechando ? "Fechando o pedido..." : "Fechar pedido"}
-                </Botao>
-              </div>
-            </div>
-          </Secao>
-        </>
-      ) : (
-        <p className="text-sm text-tinta-suave">
-          O carrinho está vazio. Escolha o produto e adicione.
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** Foto e descricao do produto padrao, no lugar onde a placa mostra os eixos. */
-function Vitrine({ produto }: { produto: ProdutoDaVenda }) {
-  if (!produto.foto_url && !produto.descricao) return null;
-
-  return (
-    <div className="flex flex-wrap items-start gap-4">
-      {produto.foto_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={produto.foto_url}
-          alt={produto.nome}
-          className="size-32 rounded-lg border border-borda object-cover"
-        />
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center p-4 pb-24 md:pb-4">
+          <button
+            type="button"
+            onClick={() => setGavetaAberta(true)}
+            className="pointer-events-auto flex items-center gap-3 rounded-full bg-marca py-3 pr-4 pl-5 text-white shadow-lg transition-colors hover:bg-marca-escura"
+          >
+            <ShoppingCart size={18} aria-hidden />
+            <span className="text-sm font-medium">
+              {pecas} {pecas === 1 ? "peça" : "peças"}
+            </span>
+            <span className="text-sm font-semibold tabular-nums">
+              {moeda(totalDoCarrinho(carrinho.itens))}
+            </span>
+            <span className="rounded-full bg-white/20 px-3 py-1 text-sm font-medium">
+              Ver carrinho
+            </span>
+          </button>
+        </div>
       ) : null}
-      {produto.descricao ? (
-        <p className="min-w-48 flex-1 text-sm text-tinta-media">{produto.descricao}</p>
-      ) : null}
+
+      <ModalItem
+        produto={produtoAberto}
+        aoFechar={() => setProdutoAberto(null)}
+        aoAdicionar={adicionar}
+      />
+
+      <GavetaDoCarrinho
+        aberta={gavetaAberta}
+        aoFechar={() => setGavetaAberta(false)}
+        itens={carrinho.itens}
+        aoRemover={carrinho.remover}
+        aoMudarQuantidade={carrinho.mudarQuantidade}
+        aoLimpar={carrinho.limpar}
+        aoFinalizar={() => setFechamentoAberto(true)}
+      />
+
+      <ModalFechamento
+        aberto={fechamentoAberto}
+        aoFechar={() => setFechamentoAberto(false)}
+        itens={carrinho.itens}
+        clientes={clientes}
+        pixConfigurado={pixConfigurado}
+        fechando={fechando}
+        aoConfirmar={({ cliente, forma, momento, observacoes }) =>
+          fechar({
+            clienteId: cliente.id,
+            forma,
+            momento,
+            observacoes: observacoes || undefined,
+            itens: carrinho.itens.map((item) => ({
+              produtoId: item.produtoId,
+              quantidade: item.quantidade,
+              cor: item.cor,
+              nomeNegocio: item.nomeNegocio,
+              linkAvaliacao: item.linkAvaliacao,
+              placeId: item.placeId,
+            })),
+          })
+        }
+      />
     </div>
   );
 }
