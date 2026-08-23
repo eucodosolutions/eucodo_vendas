@@ -26,9 +26,9 @@ type DadosDoCliente = z.infer<typeof esquema>;
 /**
  * Cadastra ou atualiza um cliente.
  *
- * Quem pode o que fica na RLS, e nao em `if` aqui: o vendedor tem policy de
- * insert e nao tem de update, entao a edicao dele volta como erro do banco
- * mesmo que alguem chame esta acao por fora da tela.
+ * Quem pode o que fica na RLS, e nao em `if` aqui: a policy deixa o dono da
+ * conta e quem cadastrou mexerem na linha, entao chamar esta acao por fora da
+ * tela nao alcanca o cliente de outra pessoa da equipe.
  */
 export async function salvarCliente(
   _estado: EstadoCliente,
@@ -81,9 +81,18 @@ async function gravar(dados: DadosDoCliente): Promise<EstadoCliente> {
   };
 
   if (dados.id) {
-    const { error } = await supabase.from("clientes").update(campos).eq("id", dados.id);
+    // O `select` nao e enfeite: quando a policy barra a linha, o update nao
+    // levanta erro nenhum, so nao altera nada. Sem conferir o que voltou, o
+    // vendedor tentando mexer no cliente de outro receberia "atualizado".
+    const { data: alterado, error } = await supabase
+      .from("clientes")
+      .update(campos)
+      .eq("id", dados.id)
+      .select("id")
+      .maybeSingle();
 
     if (error) return { erro: motivo(error, "Não consegui salvar as alterações.") };
+    if (!alterado) return { erro: SO_QUEM_CADASTROU };
 
     revalidatePath("/clientes");
     revalidatePath(`/clientes/${dados.id}`);
@@ -114,7 +123,12 @@ export async function removerCliente(
   if (!z.string().uuid().safeParse(id).success) return { erro: "Cliente inválido." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("clientes").delete().eq("id", id);
+  const { data: removido, error } = await supabase
+    .from("clientes")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     // Pedido aponta para cliente com ON DELETE RESTRICT: apagar quem ja comprou
@@ -127,12 +141,21 @@ export async function removerCliente(
     };
   }
 
+  // Mesmo caso do update: linha barrada pela policy sai como zero linhas, e nao
+  // como erro.
+  if (!removido) return { erro: SO_QUEM_CADASTROU };
+
   revalidatePath("/clientes");
   return { sucesso: "Cliente removido." };
 }
 
+const SO_QUEM_CADASTROU =
+  "Este cliente foi cadastrado por outra pessoa da equipe. Só quem cadastrou, ou o dono da conta, pode mexer nele.";
+
 function motivo(error: { code?: string } | null, padrao: string): string {
-  if (error?.code === "23505") return "Já existe um cliente com esse WhatsApp na sua conta.";
-  if (error?.code === "42501") return "Só o dono da conta edita cliente.";
+  // A unicidade e por autor: o WhatsApp repetido que o banco recusa e sempre um
+  // cliente que a propria pessoa ja tem cadastrado. O do colega nao atrapalha.
+  if (error?.code === "23505") return "Você já cadastrou um cliente com esse WhatsApp.";
+  if (error?.code === "42501") return SO_QUEM_CADASTROU;
   return padrao;
 }

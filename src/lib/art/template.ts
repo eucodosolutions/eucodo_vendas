@@ -68,6 +68,8 @@ type Layout = {
   /** Faixa vertical onde a composicao pode viver. */
   spanTop: number;
   spanBottom: number;
+  /** Sufixo dos ids deste desenho. Ver `sufixoDosIds`. */
+  sufixo: string;
 };
 
 /** Posicoes verticais dos tres blocos, ja resolvidas para este nome. */
@@ -78,7 +80,7 @@ type Rhythm = {
   panelBottom: number;
 };
 
-function layoutFor(spec: ArtSpec): Layout {
+function layoutFor(spec: ArtSpec, sufixo: string): Layout {
   const width = spec.widthMm * U;
   const height = spec.heightMm * U;
   const margin = spec.safeMarginMm * U;
@@ -86,6 +88,7 @@ function layoutFor(spec: ArtSpec): Layout {
 
   return {
     spec,
+    sufixo,
     width,
     height,
     margin,
@@ -144,7 +147,7 @@ type BuildOptions = {
 
 export function buildDisplaySvg(input: ArtInput, options: BuildOptions = {}): string {
   const { cornerRadius = 0, showSafeArea = false, fontFamily = FONT_STACK } = options;
-  const layout = layoutFor(input.spec);
+  const layout = layoutFor(input.spec, sufixoDosIds(input, cornerRadius));
   const theme = THEMES[input.color];
   const { width, height, bleed } = layout;
 
@@ -165,7 +168,7 @@ export function buildDisplaySvg(input: ArtInput, options: BuildOptions = {}): st
 
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-bleed} ${-bleed} ${round(width + bleed * 2)} ${round(height + bleed * 2)}" width="${round(width + bleed * 2)}" height="${round(height + bleed * 2)}">`,
-    defs(),
+    defs(layout),
     `<g font-family="${fontFamily}">`,
     parts.join(""),
     "</g>",
@@ -173,10 +176,43 @@ export function buildDisplaySvg(input: ArtInput, options: BuildOptions = {}): st
   ].join("");
 }
 
-function defs(): string {
+/**
+ * Sufixo dos ids do desenho.
+ *
+ * Id em SVG vale por documento, e nao por `<svg>`. A vitrine coloca varias
+ * pecas inline na mesma pagina, entao com `id="stripeClip"` fixo todas elas
+ * apontavam para o recorte da primeira: o A6 saia com a faixa de baixo em canto
+ * reto, porque estava sendo recortado por um retangulo do tamanho do A5.
+ *
+ * Vem do proprio desenho, e nao de um contador, para a mesma arte sair sempre
+ * byte a byte igual — a peca vai para o Storage e e comparada arquivo a
+ * arquivo. Duas pecas identicas na mesma pagina repetem o id, e nesse caso
+ * apontar para o recorte da outra da no mesmo.
+ */
+function sufixoDosIds(input: ArtInput, cornerRadius: number): string {
+  const { spec } = input;
+  const chave = [
+    spec.widthMm,
+    spec.heightMm,
+    spec.bleedMm,
+    cornerRadius,
+    input.color,
+    input.tech,
+    input.businessName,
+    input.reviewUrl,
+  ].join("|");
+
+  // djb2: hash curto e estavel, so para separar um desenho do outro.
+  let hash = 5381;
+  for (let i = 0; i < chave.length; i += 1) hash = ((hash * 33) ^ chave.charCodeAt(i)) >>> 0;
+
+  return hash.toString(36);
+}
+
+function defs(layout: Layout): string {
   return [
     "<defs>",
-    '<linearGradient id="googleBorder" x1="0" y1="0" x2="1" y2="1">',
+    `<linearGradient id="googleBorder-${layout.sufixo}" x1="0" y1="0" x2="1" y2="1">`,
     `<stop offset="0" stop-color="${GOOGLE.blue}"/>`,
     `<stop offset="0.34" stop-color="${GOOGLE.green}"/>`,
     `<stop offset="0.67" stop-color="${GOOGLE.yellow}"/>`,
@@ -258,7 +294,7 @@ function middleGroup(layout: Layout, rhythm: Rhythm, subtitleColor: string): str
 
 function panelFrame(layout: Layout, rhythm: Rhythm, x: number, w: number, theme: Theme): string {
   const { contentWidth } = layout;
-  return `<rect x="${round(x)}" y="${round(rhythm.panelTop)}" width="${round(w)}" height="${round(layout.panelHeight)}" rx="${round(contentWidth * R.panelRx)}" fill="${theme.panelFill}" stroke="url(#googleBorder)" stroke-width="${round(contentWidth * R.panelStroke)}"/>`;
+  return `<rect x="${round(x)}" y="${round(rhythm.panelTop)}" width="${round(w)}" height="${round(layout.panelHeight)}" rx="${round(contentWidth * R.panelRx)}" fill="${theme.panelFill}" stroke="url(#googleBorder-${layout.sufixo})" stroke-width="${round(contentWidth * R.panelStroke)}"/>`;
 }
 
 function card(layout: Layout, x: number, y: number, w: number, h: number, theme: Theme): string {
@@ -382,9 +418,11 @@ function bottomStripe(layout: Layout, cornerRadius: number): string {
   if (!cornerRadius) return blocks;
 
   // Na previa a faixa acompanha o canto arredondado do cartao.
+  const recorte = `stripeClip-${layout.sufixo}`;
+
   return [
-    `<defs><clipPath id="stripeClip"><rect x="0" y="0" width="${round(width)}" height="${round(height)}" rx="${cornerRadius}"/></clipPath></defs>`,
-    `<g clip-path="url(#stripeClip)">${blocks}</g>`,
+    `<defs><clipPath id="${recorte}"><rect x="0" y="0" width="${round(width)}" height="${round(height)}" rx="${cornerRadius}"/></clipPath></defs>`,
+    `<g clip-path="url(#${recorte})">${blocks}</g>`,
   ].join("");
 }
 

@@ -49,3 +49,25 @@ export function EtiquetaAssinatura({ status }: { status: StatusAssinatura }) {
     </span>
   );
 }
+
+/**
+ * De quem e o cadastro, quando nao e de quem esta olhando.
+ *
+ * O dono da conta ve os clientes da conta inteira, os dele e os da equipe.
+ * Sem a etiqueta as duas agendas viram uma lista so, e o mesmo WhatsApp
+ * aparecendo duas vezes — o dele e o do vendedor — pareceria cadastro repetido
+ * em vez de dois cadastros de donos diferentes.
+ *
+ * So o primeiro nome entra: a etiqueta anda ao lado do nome do cliente, que e
+ * quem manda na linha, e "Cadastrado por Maria Aparecida da Silva" empurraria o
+ * cliente para fora da tela no celular.
+ */
+export function EtiquetaDeAutor({ nome }: { nome: string }) {
+  const primeiro = nome.trim().split(/\s+/)[0] || nome;
+
+  return (
+    <span className={`${BASE} bg-papel text-tinta-media`} title={`Cadastrado por ${nome}`}>
+      Cadastrado por {primeiro}
+    </span>
+  );
+}
