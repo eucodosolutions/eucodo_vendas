@@ -7,14 +7,13 @@ import type { ArtSpec } from "./types";
  * cadastrar um produto novo no painel basta para a arte sair no formato novo.
  */
 export function specDoProduto(
-  produto: Pick<Produto, "codigo" | "nome">,
+  produto: Pick<Produto, "nome">,
   medidas: Pick<
     ProdutoAvaliacao,
     "largura_mm" | "altura_mm" | "margem_seguranca_mm" | "sangria_mm" | "dpi"
   >,
 ): ArtSpec {
   return {
-    code: produto.codigo,
     label: produto.nome,
     widthMm: Number(medidas.largura_mm),
     heightMm: Number(medidas.altura_mm),

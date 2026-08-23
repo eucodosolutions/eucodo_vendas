@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { CORES, TECNOLOGIAS } from "@/lib/catalogo";
+import { ACABAMENTO_PADRAO, CORES, TAMANHOS, TECNOLOGIAS } from "@/lib/catalogo";
 import { contaDoDono } from "@/lib/supabase/dono";
 import { createClient } from "@/lib/supabase/server";
 
@@ -24,34 +24,42 @@ const medida = z
 const esquemaProduto = z.object({
   id: z.string().uuid().optional(),
   tipo: z.enum(["avaliacao", "padrao"]),
-  codigo: z
-    .string()
-    .trim()
-    .min(1, "Digite um código para o produto.")
-    .max(12)
-    .regex(/^[A-Za-z0-9-]+$/, "O código aceita letras, números e hífen."),
-  nome: z.string().trim().min(1, "Digite o nome do produto."),
+  nome: z.string().trim().min(1, "Digite o nome do produto.").max(80),
   descricao: z.string().trim().max(500).optional(),
   preco: reais,
   comissao: medida.pipe(
     z.number().min(0, "Comissão não pode ser negativa.").max(100, "Comissão passa de 100%."),
   ),
   prazoEntrega: z.coerce.number().int().min(0).max(365),
-  ativo: z.coerce.boolean(),
 });
 
+/** O que a placa oferece na venda, e em que formato ela e cortada. */
 const esquemaPlaca = z.object({
+  cores: z.array(z.enum(CORES)).min(1, "Escolha pelo menos uma cor."),
+  tecnologia: z.enum(TECNOLOGIAS),
+});
+
+/** So chega a ser lido quando o tamanho e "personalizado". */
+const esquemaMedidasProprias = z.object({
   largura: medida.pipe(z.number().min(10, "Largura muito pequena.").max(2000)),
   altura: medida.pipe(z.number().min(10, "Altura muito pequena.").max(2000)),
   margem: medida.pipe(z.number().min(0).max(100)),
   sangria: medida.pipe(z.number().min(0).max(100)),
   dpi: z.coerce.number().int().min(72).max(1200),
-  cores: z.array(z.enum(CORES)).min(1, "Escolha pelo menos uma cor."),
-  tecnologias: z.array(z.enum(TECNOLOGIAS)).min(1, "Escolha pelo menos uma tecnologia."),
 });
+
+const esquemaTamanho = z.enum(["a6", "a5", "personalizado"]);
 
 /** 5 MB: foto de produto tirada no celular cabe folgada, e o bucket nao incha. */
 const TAMANHO_MAXIMO_FOTO = 5 * 1024 * 1024;
+
+type Medidas = {
+  largura_mm: number;
+  altura_mm: number;
+  margem_seguranca_mm: number;
+  sangria_mm: number;
+  dpi: number;
+};
 
 /**
  * Salva um produto e, quando for placa, as medidas dele.
@@ -59,6 +67,9 @@ const TAMANHO_MAXIMO_FOTO = 5 * 1024 * 1024;
  * As duas tabelas num formulario so: produto de avaliacao sem medida nao gera
  * arte, entao separar as telas criaria um estado intermediario em que o
  * catalogo existe mas a venda quebra no fechamento do pedido.
+ *
+ * `ativo` nao entra aqui. Produto novo nasce ativo pelo default do banco, e
+ * ligar ou desligar e o interruptor da lista: uma decisao, um lugar so.
  */
 export async function salvarProduto(
   _estado: EstadoProduto,
@@ -67,13 +78,11 @@ export async function salvarProduto(
   const resultado = esquemaProduto.safeParse({
     id: dados.get("id") || undefined,
     tipo: dados.get("tipo"),
-    codigo: dados.get("codigo"),
     nome: dados.get("nome"),
     descricao: dados.get("descricao") || undefined,
     preco: dados.get("preco"),
     comissao: dados.get("comissao") ?? "0",
     prazoEntrega: dados.get("prazo") ?? 3,
-    ativo: dados.get("ativo") === "on",
   });
 
   if (!resultado.success) {
@@ -87,23 +96,22 @@ export async function salvarProduto(
     return { erro: "Produto padrão precisa de descrição: é o que o cliente lê na venda." };
   }
 
-  let placa: z.infer<typeof esquemaPlaca> | null = null;
+  let placa: (z.infer<typeof esquemaPlaca> & Medidas) | null = null;
 
   if (ehPlaca) {
-    const medidas = esquemaPlaca.safeParse({
-      largura: dados.get("largura"),
-      altura: dados.get("altura"),
-      margem: dados.get("margem") ?? "7",
-      sangria: dados.get("sangria") ?? "0",
-      dpi: dados.get("dpi") ?? 300,
+    const oferta = esquemaPlaca.safeParse({
       cores: dados.getAll("cores"),
-      tecnologias: dados.getAll("tecnologias"),
+      tecnologia: dados.get("tecnologia"),
     });
 
-    if (!medidas.success) {
-      return { erro: medidas.error.issues[0]?.message ?? "Confira as medidas da placa." };
+    if (!oferta.success) {
+      return { erro: oferta.error.issues[0]?.message ?? "Confira as opções da placa." };
     }
-    placa = medidas.data;
+
+    const medidas = medidasDoTamanho(dados);
+    if ("erro" in medidas) return { erro: medidas.erro };
+
+    placa = { ...oferta.data, ...medidas };
   }
 
   const assinaturaId = await contaDoDono();
@@ -112,13 +120,11 @@ export async function salvarProduto(
   const supabase = await createClient();
   const linha = {
     tipo: produto.tipo,
-    codigo: produto.codigo.toUpperCase(),
     nome: produto.nome,
     descricao: produto.descricao || null,
     preco_centavos: Math.round(produto.preco * 100),
     comissao_percentual: produto.comissao,
     prazo_entrega_dias: produto.prazoEntrega,
-    ativo: produto.ativo,
   };
 
   let produtoId = produto.id;
@@ -142,13 +148,13 @@ export async function salvarProduto(
       {
         produto_id: produtoId,
         assinatura_id: assinaturaId,
-        largura_mm: placa.largura,
-        altura_mm: placa.altura,
-        margem_seguranca_mm: placa.margem,
-        sangria_mm: placa.sangria,
+        largura_mm: placa.largura_mm,
+        altura_mm: placa.altura_mm,
+        margem_seguranca_mm: placa.margem_seguranca_mm,
+        sangria_mm: placa.sangria_mm,
         dpi: placa.dpi,
         cores: placa.cores,
-        tecnologias: placa.tecnologias,
+        tecnologia: placa.tecnologia,
       },
       { onConflict: "produto_id" },
     );
@@ -162,6 +168,68 @@ export async function salvarProduto(
   revalidatePath("/produtos");
   revalidatePath("/vender");
   return { sucesso: `${linha.nome} salvo.` };
+}
+
+/**
+ * As medidas do tamanho escolhido.
+ *
+ * Em A6 e A5 as medidas vem da constante, e nao dos campos: eles chegam so de
+ * leitura na tela, e o que a tela mostra travado o navegador continua podendo
+ * reescrever. Digitar medida so acontece de verdade em "personalizado".
+ */
+function medidasDoTamanho(dados: FormData): Medidas | { erro: string } {
+  const tamanho = esquemaTamanho.safeParse(dados.get("tamanho"));
+  if (!tamanho.success) return { erro: "Escolha o tamanho da placa." };
+
+  if (tamanho.data !== "personalizado") {
+    const { largura_mm, altura_mm } = TAMANHOS[tamanho.data];
+    return { largura_mm, altura_mm, ...ACABAMENTO_PADRAO };
+  }
+
+  const proprias = esquemaMedidasProprias.safeParse({
+    largura: dados.get("largura"),
+    altura: dados.get("altura"),
+    margem: dados.get("margem") ?? String(ACABAMENTO_PADRAO.margem_seguranca_mm),
+    sangria: dados.get("sangria") ?? String(ACABAMENTO_PADRAO.sangria_mm),
+    dpi: dados.get("dpi") ?? ACABAMENTO_PADRAO.dpi,
+  });
+
+  if (!proprias.success) {
+    return { erro: proprias.error.issues[0]?.message ?? "Confira as medidas da placa." };
+  }
+
+  return {
+    largura_mm: proprias.data.largura,
+    altura_mm: proprias.data.altura,
+    margem_seguranca_mm: proprias.data.margem,
+    sangria_mm: proprias.data.sangria,
+    dpi: proprias.data.dpi,
+  };
+}
+
+/**
+ * Liga e desliga o produto na venda, direto da lista.
+ *
+ * E o unico caminho para esse campo: o popup de cadastro nao tem "ativo", e
+ * produto novo nasce valendo. Tirar da venda e decisao de um toque, e nao
+ * motivo para abrir um formulario inteiro.
+ */
+export async function alternarProduto(id: string, ativo: boolean): Promise<EstadoProduto> {
+  if (!z.string().uuid().safeParse(id).success) return { erro: "Produto inválido." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("produtos")
+    .update({ ativo })
+    .eq("id", id)
+    .select("nome")
+    .single();
+
+  if (error || !data) return { erro: "Não consegui mudar este produto." };
+
+  revalidatePath("/produtos");
+  revalidatePath("/vender");
+  return { sucesso: ativo ? `${data.nome} voltou para a venda.` : `${data.nome} saiu da venda.` };
 }
 
 /**
@@ -220,7 +288,7 @@ export async function removerProduto(
     return {
       erro:
         error.code === "23503"
-          ? "Este produto já foi vendido. Desmarque “Ativo na venda” para tirá-lo do catálogo."
+          ? "Este produto já foi vendido. Desligue-o na lista para tirá-lo da venda."
           : "Não consegui remover este produto.",
     };
   }
@@ -231,6 +299,6 @@ export async function removerProduto(
 }
 
 function motivo(error: { code?: string } | null, padrao: string): string {
-  if (error?.code === "23505") return "Já existe um produto com esse código na sua conta.";
+  if (error?.code === "23505") return "Já existe um produto com esse nome na sua conta.";
   return padrao;
 }

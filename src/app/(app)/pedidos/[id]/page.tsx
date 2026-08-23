@@ -8,6 +8,7 @@ import { EtiquetaPagamento, EtiquetaStatus } from "@/components/etiquetas";
 import { LinkBotao } from "@/components/ui/link-botao";
 import { Dado, Secao } from "@/components/ui/secao";
 import {
+  apelidoDeArquivo,
   dataHora,
   moeda,
   ROTULO_COR,
@@ -64,7 +65,7 @@ export default async function PaginaPedido({ params, searchParams }: PageProps<"
       download: item.arte_jpg_path
         ? ((
             await supabase.storage.from("artes").createSignedUrl(item.arte_jpg_path, UMA_HORA, {
-              download: `${pedido.codigo}-${item.ordem}-${item.produto_codigo}.jpg`,
+              download: `${pedido.codigo}-${item.ordem}-${apelidoDeArquivo(item.produto_nome)}.jpg`,
             })
           ).data?.signedUrl ?? null)
         : null,

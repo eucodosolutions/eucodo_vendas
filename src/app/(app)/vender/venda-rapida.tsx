@@ -18,7 +18,6 @@ import type { CorArte, TecnologiaArte, TipoProduto } from "@/types/database";
 export type ProdutoDaVenda = {
   id: string;
   tipo: TipoProduto;
-  codigo: string;
   nome: string;
   descricao: string | null;
   foto_url: string | null;
@@ -28,7 +27,7 @@ export type ProdutoDaVenda = {
     largura_mm: number;
     altura_mm: number;
     cores: CorArte[];
-    tecnologias: TecnologiaArte[];
+    tecnologia: TecnologiaArte;
   } | null;
 };
 
@@ -49,7 +48,6 @@ export function VendaRapida({
 
   const [produtoId, setProdutoId] = useState(produtos[0].id);
   const [cor, setCor] = useState<CorArte | null>(null);
-  const [tecnologia, setTecnologia] = useState<TecnologiaArte | null>(null);
   const [quantidade, setQuantidade] = useState(1);
   const [nomeNegocio, setNomeNegocio] = useState("");
   const [linkAvaliacao, setLinkAvaliacao] = useState("");
@@ -66,16 +64,6 @@ export function VendaRapida({
   const corEscolhida = useMemo(
     () => (placa ? (cor && placa.cores.includes(cor) ? cor : placa.cores[0]) : null),
     [placa, cor],
-  );
-
-  const tecnologiaEscolhida = useMemo(
-    () =>
-      placa
-        ? tecnologia && placa.tecnologias.includes(tecnologia)
-          ? tecnologia
-          : placa.tecnologias[0]
-        : null,
-    [placa, tecnologia],
   );
 
   function adicionar() {
@@ -95,18 +83,16 @@ export function VendaRapida({
     carrinho.adicionar({
       produtoId: produto.id,
       tipo: produto.tipo,
-      produtoCodigo: produto.codigo,
       produtoNome: produto.nome,
       precoUnitarioCentavos: produto.preco_centavos,
       quantidade,
       cor: corEscolhida ?? undefined,
-      tecnologia: tecnologiaEscolhida ?? undefined,
       nomeNegocio: placa ? nomeNegocio.trim() : undefined,
       linkAvaliacao: placa ? linkAvaliacao.trim() : undefined,
     });
 
-    // Limpa so o que muda de peca para peca. Produto, cor e tecnologia ficam,
-    // porque o caso comum e o mesmo modelo para duas empresas.
+    // Limpa so o que muda de peca para peca. Produto e cor ficam, porque o caso
+    // comum e o mesmo modelo para duas empresas.
     setNomeNegocio("");
     setLinkAvaliacao("");
     setQuantidade(1);
@@ -128,7 +114,6 @@ export function VendaRapida({
         produtoId: item.produtoId,
         quantidade: item.quantidade,
         cor: item.cor,
-        tecnologia: item.tecnologia,
         nomeNegocio: item.nomeNegocio,
         linkAvaliacao: item.linkAvaliacao,
         placeId: item.placeId,
@@ -161,20 +146,8 @@ export function VendaRapida({
             aoSelecionar={setProdutoId}
           />
 
-          {/* Eixo de uma opcao so nao e escolha: vira ruido na frente do cliente. */}
-          {placa && placa.tecnologias.length > 1 ? (
-            <Escolha
-              titulo="Tecnologia"
-              opcoes={placa.tecnologias.map((valor) => ({
-                valor,
-                rotulo: valor === "qr_nfc" ? "QR + aproximação" : "Só QR code",
-                detalhe: valor === "qr_nfc" ? "Escaneia ou aproxima" : "Escaneia a câmera",
-              }))}
-              selecionado={tecnologiaEscolhida!}
-              aoSelecionar={setTecnologia}
-            />
-          ) : null}
-
+          {/* A tecnologia nao e escolha aqui: ela e o proprio produto, e cada
+              uma tem o seu preco. O que muda dentro do produto e so a cor. */}
           {placa && placa.cores.length > 1 ? (
             <Escolha
               titulo="Arte"
@@ -197,7 +170,7 @@ export function VendaRapida({
               {[
                 produto.nome,
                 corEscolhida ? ROTULO_COR[corEscolhida].toLowerCase() : null,
-                tecnologiaEscolhida ? ROTULO_TECNOLOGIA[tecnologiaEscolhida].toLowerCase() : null,
+                placa ? ROTULO_TECNOLOGIA[placa.tecnologia].toLowerCase() : null,
               ]
                 .filter(Boolean)
                 .join(", ")}

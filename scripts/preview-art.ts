@@ -1,7 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { renderPreviewPng } from "../src/lib/art/render";
-import { DEFAULT_SPECS, type ArtColor, type ArtTech } from "../src/lib/art/types";
+import { type ArtColor, type ArtTech } from "../src/lib/art/types";
+import { specDoTamanho, TAMANHOS } from "../src/lib/catalogo";
 
 const OUT_DIR = path.join(process.cwd(), ".preview");
 
@@ -12,7 +13,7 @@ const CASES: Array<{
   color: ArtColor;
   tech: ArtTech;
   business: string;
-  size?: keyof typeof DEFAULT_SPECS;
+  size?: keyof typeof TAMANHOS;
   safeArea?: boolean;
 }> = [
   { name: "branco-nfc", color: "branco", tech: "qr_nfc", business: "Barbearia Vintage" },
@@ -26,7 +27,7 @@ const CASES: Array<{
     tech: "qr_nfc",
     business: "Restaurante Sabor da Terra Nordestina",
   },
-  { name: "a5-branco-nfc", color: "branco", tech: "qr_nfc", business: "Barbearia Vintage", size: "A5" },
+  { name: "a5-branco-nfc", color: "branco", tech: "qr_nfc", business: "Barbearia Vintage", size: "a5" },
   {
     name: "margem-seguranca",
     color: "branco",
@@ -42,7 +43,7 @@ async function main() {
   for (const item of CASES) {
     const buffer = await renderPreviewPng(
       {
-        spec: DEFAULT_SPECS[item.size ?? "A6"],
+        spec: specDoTamanho(item.size ?? "a6"),
         color: item.color,
         tech: item.tech,
         businessName: item.business,

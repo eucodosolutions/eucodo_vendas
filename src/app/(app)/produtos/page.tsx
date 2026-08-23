@@ -21,7 +21,7 @@ export default async function PaginaProdutos() {
   const { data: produtos } = await supabase
     .from("produtos")
     .select(
-      "id, tipo, codigo, nome, descricao, foto_path, preco_centavos, comissao_percentual, prazo_entrega_dias, ativo, produto_avaliacao (largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi, cores, tecnologias)",
+      "id, tipo, nome, descricao, foto_path, preco_centavos, comissao_percentual, prazo_entrega_dias, ativo, produto_avaliacao (largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi, cores, tecnologia)",
     )
     .order("ordem")
     .order("nome")

@@ -239,7 +239,6 @@ function mensagemDeEnvio(
  */
 type ProdutoParaArte = {
   id: string;
-  codigo: string;
   nome: string;
   produto_avaliacao: {
     largura_mm: number;
@@ -277,7 +276,7 @@ export async function regerarArte(_estado: EstadoAcao, dados: FormData): Promise
   const { data: produtos } = await supabase
     .from("produtos")
     .select(
-      "id, codigo, nome, produto_avaliacao (largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi)",
+      "id, nome, produto_avaliacao (largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi)",
     )
     .in("id", ids)
     .returns<ProdutoParaArte[]>();
@@ -290,7 +289,7 @@ export async function regerarArte(_estado: EstadoAcao, dados: FormData): Promise
 
   const faltando = placas.find((item) => !porId.has(item.produto_id));
   if (faltando) {
-    return { erro: `O produto ${faltando.produto_codigo} não existe mais no seu catálogo.` };
+    return { erro: `O produto ${faltando.produto_nome} não existe mais no seu catálogo.` };
   }
 
   let refeitos = 0;
