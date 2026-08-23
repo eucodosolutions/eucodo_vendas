@@ -14,7 +14,7 @@ export function FormularioConfiguracoes({ configuracoes }: { configuracoes: Conf
   useAviso(estado);
 
   return (
-    <Secao titulo="Pagamento e prazo">
+    <Secao titulo="Pagamento">
       <form action={acao} className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Campo
@@ -35,16 +35,6 @@ export function FormularioConfiguracoes({ configuracoes }: { configuracoes: Conf
             name="pixCidade"
             placeholder="Fortaleza"
             defaultValue={configuracoes.pix_cidade ?? ""}
-          />
-          <Campo
-            rotulo="Prazo de produção (dias)"
-            name="prazo"
-            type="number"
-            min={0}
-            max={365}
-            placeholder="3"
-            defaultValue={configuracoes.prazo_producao_dias}
-            required
           />
         </div>
 

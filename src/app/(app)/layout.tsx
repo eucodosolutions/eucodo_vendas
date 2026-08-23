@@ -12,8 +12,10 @@ export default async function LayoutDoAssinante({ children }: { children: ReactN
   // O admin opera a plataforma, nao vende. Se cair aqui, volta para o painel dele.
   if (sessao.perfil.papel === "admin") redirect("/admin");
 
+  // Vai por `/sair`, e nao direto para `/entrar`: a sessao precisa cair junto,
+  // senao o proxy devolve a pessoa para ca e os dois ficam se empurrando.
   const bloqueio = motivoDoBloqueio(sessao);
-  if (bloqueio) redirect(`/entrar?erro=${bloqueio}`);
+  if (bloqueio) redirect(`/sair?erro=${bloqueio}`);
 
   // Senha que o assinante gerou nao abre o painel: serve para entrar uma vez e
   // trocar. A tela de troca vive fora deste layout, senao o desvio se morderia.

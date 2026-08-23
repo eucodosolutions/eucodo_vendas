@@ -10,6 +10,9 @@ const ROTAS_PUBLICAS = [
   "/esqueci-senha",
   "/redefinir-senha",
   "/auth",
+  // Sair tem que valer tambem sem sessao: quem chega aqui ja pode ter perdido a
+  // dele no caminho, e mandar essa pessoa para `/entrar?proxima=/sair` e cruel.
+  "/sair",
   "/catalogo",
   "/pedido",
 ];

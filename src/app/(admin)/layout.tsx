@@ -11,7 +11,7 @@ export default async function LayoutDaPlataforma({ children }: { children: React
   if (!sessao) redirect("/entrar");
 
   if (sessao.perfil.papel !== "admin") redirect(inicioDoPapel(sessao.perfil.papel));
-  if (sessao.perfil.status !== "ativo") redirect("/entrar?erro=acesso_bloqueado");
+  if (!sessao.perfil.ativo) redirect("/sair?erro=acesso_bloqueado");
 
   return (
     <Painel papel="admin" nome={sessao.perfil.nome} conta="Plataforma">

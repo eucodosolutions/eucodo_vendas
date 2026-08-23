@@ -58,13 +58,15 @@ Deno.serve(async (requisicao) => {
   } = await supabase.auth.getUser(jwt);
   if (!user) return responder({ erro: "Credencial inválida." }, 401);
 
+  // Aqui roda a chave de servico, que passa por cima do RLS: as duas condicoes
+  // que `usuario_ativo()` conferiria no banco precisam ser conferidas na mao.
   const { data: perfil } = await supabase
     .from("perfis")
-    .select("status")
+    .select("ativo, assinaturas (status)")
     .eq("id", user.id)
     .single();
 
-  if (perfil?.status !== "ativo") {
+  if (!perfil?.ativo || perfil.assinaturas?.status !== "ativa") {
     return responder({ erro: "Acesso não liberado." }, 403);
   }
 

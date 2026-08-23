@@ -65,16 +65,19 @@ atrasaria quem vai usar o painel.
 
 ## 6. Criar a sua conta e virar administrador
 
-Suba com `npm run dev`, acesse `/criar-conta` e cadastre-se. A conta nasce como
+Suba com `npm run dev`, acesse `/criar-conta` e cadastre-se. A assinatura nasce
 `pendente` e nao entra. Rode isto uma unica vez no SQL Editor:
 
 ```sql
 update public.perfis
-set status = 'ativo', papel = 'admin'
+set papel = 'admin', assinatura_id = null
 where email = 'eucodosolutions@gmail.com';
 ```
 
-Dai em diante voce libera as proximas contas pelo painel.
+O admin da plataforma nao pertence a conta nenhuma, por isso o `assinatura_id`
+sai junto. Dai em diante voce libera as proximas contas pelo painel, em
+`/admin/assinantes`, e nao precisa mais de SQL: liberar a assinatura ja abre o
+acesso do dono e da equipe dele.
 
 ## 7. Cadastrar a instancia do WhatsApp
 

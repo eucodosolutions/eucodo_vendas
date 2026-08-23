@@ -3,11 +3,13 @@ import type { ComponentProps, ReactNode } from "react";
 
 import { ALTURA_CONTROLE, juntar } from "./controle";
 
-type Variante = "primario" | "secundario" | "sucesso";
+/** As mesmas do `Botao`: os dois sao a mesma coisa aos olhos de quem clica. */
+type Variante = "primario" | "secundario" | "fantasma" | "sucesso";
 
 const ESTILOS: Record<Variante, string> = {
   primario: "bg-marca text-white hover:bg-marca-escura",
   secundario: "bg-superficie text-tinta border border-borda-forte hover:border-tinta-suave",
+  fantasma: "bg-transparent text-marca hover:bg-marca-suave",
   sucesso: "bg-sucesso text-white hover:opacity-90",
 };
 

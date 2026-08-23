@@ -1,8 +1,10 @@
-import { Search } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 
-import { LinkBotao } from "@/components/ui/link-botao";
+import { BotaoNovoCliente } from "./botao-novo-cliente";
+import { CabecalhoDePagina } from "@/components/ui/cabecalho-de-pagina";
+import { CampoDeBusca } from "@/components/ui/campo-de-busca";
+import { CartaoDeLista } from "@/components/ui/cartao-de-lista";
+import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { dataHora, whatsappLegivel } from "@/lib/formato";
 import { sessaoDoPainel } from "@/lib/supabase/painel";
 import { createClient } from "@/lib/supabase/server";
@@ -38,50 +40,38 @@ export default async function PaginaClientes({ searchParams }: PageProps<"/clien
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-tinta">Clientes</h1>
-          <p className="mt-1 text-sm text-tinta-suave">
-            {ehVendedor
-              ? "Os clientes que você cadastrou."
-              : "Todos os clientes da sua conta, de você e da sua equipe."}
-          </p>
-        </div>
-        <LinkBotao href="/clientes/novo">Novo cliente</LinkBotao>
-      </header>
+      <CabecalhoDePagina
+        titulo="Clientes"
+        descricao={
+          ehVendedor
+            ? "Os clientes que você cadastrou."
+            : "Todos os clientes da sua conta, de você e da sua equipe."
+        }
+        acao={<BotaoNovoCliente />}
+      />
 
-      <form className="relative">
-        <Search
-          size={16}
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-tinta-suave"
-        />
-        <input
-          type="search"
-          name="busca"
-          defaultValue={termo}
+      <form>
+        <CampoDeBusca
+          rotulo="Buscar cliente"
           placeholder="Buscar por nome ou WhatsApp"
-          aria-label="Buscar cliente"
-          className="h-10 w-full rounded-lg border border-borda bg-superficie pr-3 pl-9 text-sm text-tinta transition-colors hover:border-borda-forte placeholder:text-tinta-suave/70"
+          defaultValue={termo}
         />
       </form>
 
       {clientes.length === 0 ? (
-        <div className="rounded-card border border-dashed border-borda-forte bg-superficie p-10 text-center">
-          <p className="text-sm text-tinta-suave">
-            {termo
+        <EstadoVazio
+          mensagem={
+            termo
               ? "Nenhum cliente com esse nome ou número."
-              : "Cadastre o primeiro cliente para começar a vender."}
-          </p>
-        </div>
+              : "Cadastre o primeiro cliente para começar a vender."
+          }
+          acao={termo ? undefined : <BotaoNovoCliente rotulo="Cadastrar o primeiro" />}
+        />
       ) : (
         <ul className="flex flex-col gap-2">
           {clientes.map((cliente) => (
             <li key={cliente.id}>
-              <Link
-                href={`/clientes/${cliente.id}`}
-                className="flex items-center justify-between gap-3 rounded-card border border-borda bg-superficie px-4 py-3 transition-colors hover:border-borda-forte"
-              >
+              <CartaoDeLista href={`/clientes/${cliente.id}`}>
                 <div className="min-w-0">
                   <p className="truncate text-base font-medium text-tinta">{cliente.nome}</p>
                   <p className="text-sm text-tinta-suave tabular-nums">
@@ -91,7 +81,7 @@ export default async function PaginaClientes({ searchParams }: PageProps<"/clien
                 <span className="shrink-0 text-xs text-tinta-suave tabular-nums">
                   {dataHora(cliente.criado_em)}
                 </span>
-              </Link>
+              </CartaoDeLista>
             </li>
           ))}
         </ul>

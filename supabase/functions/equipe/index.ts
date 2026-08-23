@@ -74,11 +74,11 @@ Deno.serve(async (requisicao) => {
 
   const { data: dono } = await supabase
     .from("perfis")
-    .select("id, papel, status, assinatura_id, assinaturas (status)")
+    .select("id, papel, ativo, assinatura_id, assinaturas (status)")
     .eq("id", user.id)
     .single();
 
-  if (!dono || dono.status !== "ativo" || dono.papel !== "assinante" || !dono.assinatura_id) {
+  if (!dono || !dono.ativo || dono.papel !== "assinante" || !dono.assinatura_id) {
     return responder({ erro: "Só o dono da conta cadastra vendedor." }, 403);
   }
 
