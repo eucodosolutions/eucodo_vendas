@@ -80,13 +80,18 @@ export function whatsappLegivel(normalizado: string): string {
  * nenhum, e levam para a ficha do negocio — onde ninguem avalia. O QR sai
  * impresso em acrilico e o defeito so aparece na mao do cliente.
  *
- * So dois formatos abrem o formulario:
+ * Tres formatos abrem o formulario:
  *
  * - `g.page/r/<codigo>/review`, o que o Google mostra em "Peça avaliações"
  *   dentro do painel do Perfil da Empresa;
  * - `search.google.com/local/writereview?placeid=<id>`, o que se monta a partir
- *   do id do lugar — e o que a Places API devolve para quem nao gerencia o
- *   perfil.
+ *   do id do lugar;
+ * - `www.google.com/maps/place//data=...!12e1`, que e o `writeAReviewUri` da
+ *   Places API — o formato que chega de verdade pela busca.
+ *
+ * O terceiro exige cuidado que os outros nao exigem: o mesmo host e o mesmo
+ * caminho servem tambem a lista de avaliacoes (`!9m1!1b1`) e as fotos
+ * (`!10e5`). Quem separa os tres e so o sufixo, e por isso ele e conferido.
  */
 export function validarLinkAvaliacao(bruto: string): string | null {
   const texto = bruto.trim();
@@ -111,6 +116,12 @@ export function validarLinkAvaliacao(bruto: string): string | null {
 
   if (host === "search.google.com" && /^\/local\/writereview\/?$/i.test(url.pathname)) {
     return url.searchParams.get("placeid") ? url.toString() : null;
+  }
+
+  // O `data=` do Maps nao e query string: ele vem no proprio caminho, entao a
+  // conferencia e no pathname e nao em `searchParams`.
+  if (host === "google.com" && /^\/maps\/place\//i.test(url.pathname)) {
+    return /!12e\d/.test(url.pathname) ? url.toString() : null;
   }
 
   return null;
