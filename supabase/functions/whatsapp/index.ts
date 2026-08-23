@@ -205,17 +205,20 @@ async function instanciaAtiva(
     .eq("assinatura_id", assinaturaId)
     .single();
 
-  const consulta = supabase
+  // Conta sem instancia manda por link, ponto. Ate a conexao virar tela de
+  // Ajustes esta busca caia em "a primeira instancia ativa que achar" quando a
+  // conta nao tinha a sua, o que numa instalacao com um assinante so era
+  // conveniencia — e em multiassinatura fazia a mensagem de um sair pelo
+  // WhatsApp de outro, com o cliente respondendo para o numero errado.
+  if (!config?.instancia_id) return null;
+
+  const { data: cadastro } = await supabase
     .from("instancias_whatsapp")
     .select("id, host")
+    .eq("id", config.instancia_id)
     .eq("ativo", true)
-    .limit(1);
+    .maybeSingle();
 
-  const { data } = config?.instancia_id
-    ? await consulta.eq("id", config.instancia_id)
-    : await consulta;
-
-  const cadastro = data?.[0];
   if (!cadastro) return null;
 
   const { data: token } = await supabase.rpc("token_da_instancia", {

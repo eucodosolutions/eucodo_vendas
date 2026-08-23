@@ -52,15 +52,30 @@ Nada de segredo entra no Vercel nem no `.env` da aplicacao.
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` ja chegam
 injetados em toda Edge Function, sem precisar cadastrar.
 
-O token da uazapi e diferente: como cada assinante tera a sua instancia, o token
+O token da uazapi e diferente: cada assinante tem a sua instancia, entao o token
 nao pode ser um valor global de funcao. Ele fica **cifrado no Vault**, uma linha
 por instancia, e a tabela `instancias_whatsapp` guarda so o id do segredo.
 
-- Cadastrar: `select public.registrar_instancia_whatsapp(rotulo, host, token);`
+Quem cadastra, no caminho normal, e a Edge Function `whatsapp-instancia`, quando
+o assinante clica em "Conectar o WhatsApp" em Ajustes. As funcoes abaixo existem
+para o caso de precisar mexer na mao:
+
+- Cadastrar: `select public.registrar_instancia_whatsapp(rotulo, host, token, observacao, assinatura_id);`
 - Trocar: `select public.trocar_token_instancia(id, novo_token);`
+- Esquecer: `public.esquecer_instancia_whatsapp(id)` apaga a linha e o segredo
+  junto, e so a `service_role` executa. E o que desentala uma conta cuja
+  instancia sumiu do lado da uazapi.
 - Ler: `public.token_da_instancia(id)`, com `execute` concedido apenas a
   `service_role`. E a unica porta de saida do token, e ela so abre de dentro da
   Edge Function.
+
+O **admintoken** da uazapi, esse sim, e segredo de funcao: e um so para a
+plataforma inteira, e e com ele que a instancia de cada assinante e criada.
+
+```
+npx supabase secrets set UAZAPI_HOST=https://SEUSERVIDOR.uazapi.com --project-ref SEUREF
+npx supabase secrets set UAZAPI_ADMIN_TOKEN=... --project-ref SEUREF
+```
 
 A chave do Google e o outro caso, e o oposto do da uazapi: ela e a mesma para a
 plataforma inteira, nao muda por assinante, entao e segredo de funcao mesmo.

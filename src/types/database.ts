@@ -219,6 +219,10 @@ export type InstanciaWhatsapp = {
   host: string;
   /** Id do segredo no Vault. O token em si nunca sai do banco. */
   token_secreto_id: string;
+  /** De quem e a instancia. Nulo na legada, cadastrada por SQL. */
+  assinatura_id: string | null;
+  /** O id que a instancia tem la na uazapi, para achar a mesma no painel deles. */
+  id_remoto: string | null;
   ativo: boolean;
   observacao: string | null;
   criado_em: string;
@@ -287,8 +291,19 @@ export type Database = {
       pedido_visivel: { Args: { p_pedido: string }; Returns: boolean };
       pedido_editavel: { Args: { p_pedido: string }; Returns: boolean };
       registrar_instancia_whatsapp: {
-        Args: { p_rotulo: string; p_host: string; p_token: string; p_observacao?: string };
+        Args: {
+          p_rotulo: string;
+          p_host: string;
+          p_token: string;
+          p_observacao?: string;
+          p_assinatura_id?: string;
+          p_id_remoto?: string | null;
+        };
         Returns: string;
+      };
+      esquecer_instancia_whatsapp: {
+        Args: { p_instancia_id: string };
+        Returns: undefined;
       };
       trocar_token_instancia: {
         Args: { p_instancia_id: string; p_token: string };

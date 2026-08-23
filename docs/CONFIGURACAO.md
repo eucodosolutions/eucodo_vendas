@@ -79,26 +79,58 @@ sai junto. Dai em diante voce libera as proximas contas pelo painel, em
 `/admin/assinantes`, e nao precisa mais de SQL: liberar a assinatura ja abre o
 acesso do dono e da equipe dele.
 
-## 7. Cadastrar a instancia do WhatsApp
+## 7. Ligar o servidor de WhatsApp
 
 O envio funciona sem isso: sem instancia conectada, o painel devolve um botao
-que abre o WhatsApp com a mensagem pronta e voce manda na mao. Cadastrar a
-instancia e o que faz a mensagem sair sozinha, com a arte anexada.
+que abre o WhatsApp com a mensagem pronta e voce manda na mao. Conectar e o que
+faz a mensagem sair sozinha, com a arte anexada.
 
-O token fica cifrado no Vault do Supabase, e a tabela guarda so o id do
-segredo. Quem decifra e uma funcao que so a chave de servico executa, ou seja,
-so a Edge Function de envio. No SQL Editor:
+Quem cria a instancia e a plataforma, e nao o assinante: ele nao tem conta na
+uazapi e nunca ve token nenhum. Em Ajustes ele clica em "Conectar o WhatsApp",
+a Edge Function cria a instancia no seu servidor com o **admintoken**, guarda o
+token dela cifrada no Vault e devolve o QR code para ele escanear — igual ao
+WhatsApp Web, que e a unica referencia que ele tem para isso.
+
+Para isso funcionar, dois segredos precisam existir do lado do Supabase. Em
+Edge Functions, Secrets:
+
+| Segredo | Onde encontrar |
+| --- | --- |
+| `UAZAPI_HOST` | O endereco do seu servidor, tipo `https://eucodosolutions.uazapi.com` |
+| `UAZAPI_ADMIN_TOKEN` | O admintoken da sua conta uazapi |
+
+Sem os dois, Ajustes diz que o servidor de WhatsApp ainda nao foi configurado, e
+todo mundo continua vendendo por link. O admintoken abre o servidor inteiro, por
+isso ele nao aparece em `.env.local` nem em variavel da Vercel: quem o usa e a
+Edge Function, e so ela.
+
+O token de cada instancia fica cifrado no Vault, e a tabela guarda so o id do
+segredo. Quem decifra e uma funcao que so a chave de servico executa. Uma
+instancia por conta, garantida por indice unico.
+
+Antes de cada envio a funcao consulta `GET /instance/status` na uazapi. Se a
+instancia estiver desconectada, ou se voce marcar `ativo = false` porque o
+assinante parou de pagar, o sistema volta sozinho para o link manual. Nenhuma
+venda depende da API estar de pe.
+
+Se a instancia sumir do lado da uazapi — o plano caiu, ou a instancia gratuita
+expirou depois de uma hora — o painel percebe pelo 401, esquece o cadastro
+morto, e o assinante consegue conectar de novo sem ninguem mexer em SQL.
+
+Para cadastrar uma instancia na mao, fora do painel, ainda da:
 
 ```sql
 select public.registrar_instancia_whatsapp(
   'Eucodo',
   'https://eucodosolutions.uazapi.com',
-  'TOKEN_DA_INSTANCIA'
+  'TOKEN_DA_INSTANCIA',
+  null,
+  'ID_DA_ASSINATURA'
 );
 
 update public.configuracoes
 set instancia_id = (select id from public.instancias_whatsapp order by criado_em desc limit 1)
-where id = true;
+where assinatura_id = 'ID_DA_ASSINATURA';
 ```
 
 Para trocar o token depois, sem criar segredo orfao:
@@ -106,11 +138,6 @@ Para trocar o token depois, sem criar segredo orfao:
 ```sql
 select public.trocar_token_instancia('ID_DA_INSTANCIA', 'NOVO_TOKEN');
 ```
-
-Antes de cada envio a funcao consulta `GET /instance/status` na uazapi. Se a
-instancia estiver desconectada, ou se voce marcar `ativo = false` porque o
-assinante parou de pagar, o sistema volta sozinho para o link manual. Nenhuma
-venda depende da API estar de pe.
 
 ## 8. Conferir o caminho todo
 
