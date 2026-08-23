@@ -29,7 +29,9 @@ begin
    where c.conrelid = 'public.clientes'::regclass
      and c.contype = 'u'
      and (
-       select array_agg(a.attname order by a.attname)
+       -- `attname` e do tipo `name`, e nao `text`: sem o cast a comparacao com
+       -- o array literal levanta "operator does not exist: name[] = text[]".
+       select array_agg(a.attname::text order by a.attname)
          from unnest(c.conkey) as k(attnum)
          join pg_attribute a on a.attrelid = c.conrelid and a.attnum = k.attnum
      ) = array['assinatura_id', 'whatsapp'];
