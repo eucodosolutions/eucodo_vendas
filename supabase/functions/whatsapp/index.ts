@@ -11,6 +11,13 @@
 // O pedido tem itens, e cada item tem a propria arte. O envio e um texto de
 // resumo mais uma imagem por item: o cliente precisa ver a placa de cada
 // negocio dele, nao so a primeira.
+//
+// O PIX copia e cola sai sozinho, na ultima mensagem. Dentro do resumo ele era
+// impossivel de copiar no celular: o resumo viaja como legenda da primeira
+// arte, e legenda de imagem no WhatsApp nao tem "copiar" — sobrava selecionar
+// oitenta caracteres de BR Code com o dedo, no meio de um paragrafo, sem pegar
+// nada a mais nem a menos. Mensagem de texto com o codigo e nada mais se copia
+// inteira num toque, que e o que o cliente precisa colar no banco dele.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { CABECALHOS_CORS, responder } from "../_shared/cors.ts";
@@ -97,26 +104,33 @@ Deno.serve(async (requisicao) => {
     (a: { ordem: number }, b: { ordem: number }) => a.ordem - b.ordem,
   );
 
-  const texto =
-    corpo.textoManual ?? (await montarTexto(supabase, corpo.chave, pedido, itens));
-  if (!texto) return responder({ erro: "Modelo de mensagem não encontrado." }, 404);
+  const montado = corpo.textoManual
+    ? { texto: corpo.textoManual, pix: "" }
+    : await montarTexto(supabase, corpo.chave, pedido, itens);
+  if (!montado) return responder({ erro: "Modelo de mensagem não encontrado." }, 404);
+
+  const { texto, pix } = montado;
+
+  // O que foi dito ao cliente, inteiro. E o que vai no log e no link manual —
+  // ali o vendedor manda uma mensagem so, e o codigo precisa estar dentro dela.
+  const conversa = pix ? `${texto}\n\n${pix}` : texto;
 
   const instancia = await instanciaAtiva(supabase, pedido.assinatura_id);
-  const linkManual = montarLinkWhatsapp(destino, texto);
+  const linkManual = montarLinkWhatsapp(destino, conversa);
 
   if (!instancia) {
     await registrar(supabase, {
       pedidoId: pedido.id,
       destino,
       chave: corpo.chave,
-      texto,
+      texto: conversa,
       temMidia: false,
       via: "link",
       sucesso: false,
       erro: "Sem instância conectada, enviado por link",
     });
 
-    return responder<Resultado>({ enviado: false, via: "link", link: linkManual, texto });
+    return responder<Resultado>({ enviado: false, via: "link", link: linkManual, texto: conversa });
   }
 
   // Uma imagem por item. O texto de resumo viaja com a primeira, e as demais
@@ -160,13 +174,27 @@ Deno.serve(async (requisicao) => {
         imagem: arte.url!,
       });
     }
+
+    // Por ultimo, e sozinho: o codigo fica sendo a mensagem mais recente da
+    // conversa, sem imagem junto, e o cliente copia com um toque na hora de
+    // pagar. Falhar aqui nao derruba o envio — o resumo ja chegou, e o pedido
+    // guarda o copia e cola para o vendedor reenviar.
+    if (pix) {
+      await enviarPelaUazapi({
+        host: instancia.host,
+        token: instancia.token,
+        numero: destino,
+        texto: pix,
+        imagem: null,
+      });
+    }
   }
 
   await registrar(supabase, {
     pedidoId: pedido.id,
     destino,
     chave: corpo.chave,
-    texto,
+    texto: conversa,
     temMidia: comUrl.length > 0,
     via: "uazapi",
     sucesso: envio.ok,
@@ -180,12 +208,12 @@ Deno.serve(async (requisicao) => {
       enviado: false,
       via: "link",
       link: linkManual,
-      texto,
+      texto: conversa,
       erro: envio.erro,
     });
   }
 
-  return responder<Resultado>({ enviado: true, via: "uazapi", texto });
+  return responder<Resultado>({ enviado: true, via: "uazapi", texto: conversa });
 });
 
 /**
@@ -296,6 +324,12 @@ async function enviarPelaUazapi({
  * `{itens}` e a lista, uma linha por item. `{nome_negocio}` aponta para o
  * primeiro item e cai no nome do cliente quando o pedido nao tem placa nenhuma,
  * que e justamente o caso de um pedido so de produto padrao.
+ *
+ * O `{pix}` sai da substituicao e volta separado, porque ele nao e texto: e um
+ * BR Code que o cliente precisa copiar inteiro. Quem chama decide se manda numa
+ * mensagem so dele — que e o caminho da uazapi — ou se cola no fim do texto,
+ * que e o do link manual. Vazio quando o modelo nao pede o codigo ou quando o
+ * pedido nao tem cobranca gravada, e ai nada muda.
  */
 async function montarTexto(
   // deno-lint-ignore no-explicit-any
@@ -305,7 +339,7 @@ async function montarTexto(
   pedido: any,
   // deno-lint-ignore no-explicit-any
   itens: any[],
-): Promise<string | null> {
+): Promise<{ texto: string; pix: string } | null> {
   const { data: modelo } = await supabase
     .from("modelos_mensagem")
     .select("corpo")
@@ -356,16 +390,24 @@ async function montarTexto(
     quantidade: String(itens.reduce((soma, item) => soma + item.quantidade, 0)),
     total: formatarMoeda(pedido.total_centavos),
     prazo: prazoLegivel(pedido.prazo_entrega_dias),
-    // Montado no fechamento e gravado no pedido, e nao remontado aqui: o codigo
-    // carrega o total e o numero daquele pedido, e a chave PIX da conta pode
-    // ter mudado desde entao. So o modelo `pedido_criado_pix_agora` le esta chave.
-    pix: pedido.pix_copia_e_cola ?? "",
+    // O `{pix}` some do corpo e vira mensagem propria. Fica no mapa mesmo assim
+    // para que a chave nao escape do `replace` e apareca escrita no WhatsApp.
+    pix: "",
   };
 
-  return modelo.corpo.replace(
+  const texto = modelo.corpo.replace(
     /\{(\w+)\}/g,
     (original: string, chaveDoCampo: string) => valores[chaveDoCampo] ?? original,
   );
+
+  // Montado no fechamento e gravado no pedido, e nao remontado aqui: o codigo
+  // carrega o total e o numero daquele pedido, e a chave PIX da conta pode ter
+  // mudado desde entao. So o modelo `pedido_criado_pix_agora` pede esta chave.
+  const pix = /\{pix\}/.test(modelo.corpo) ? (pedido.pix_copia_e_cola ?? "") : "";
+
+  // O modelo termina no `{pix}`, entao tirar o codigo do corpo deixa linha em
+  // branco sobrando no fim da mensagem.
+  return { texto: texto.replace(/\s+$/, ""), pix };
 }
 
 /**

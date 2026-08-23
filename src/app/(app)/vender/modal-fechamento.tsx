@@ -217,6 +217,6 @@ function mensagemDoCombinado({
   }
 
   return pixConfigurado
-    ? `A mensagem vai com o PIX copia e cola de ${moeda(total)}, já com o valor dentro.`
+    ? `Depois da arte vai o PIX copia e cola de ${moeda(total)}, sozinho numa mensagem, para o cliente copiar de uma vez.`
     : "Sem chave PIX em Ajustes, a mensagem vai sem o copia e cola e deixa o acerto para a conversa.";
 }
