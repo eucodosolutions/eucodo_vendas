@@ -143,6 +143,7 @@ function Formulario({
         id: resposta.negocioId,
         nome,
         link_avaliacao: negocio.linkAvaliacao,
+        google_place_id: negocio.placeId ?? null,
         endereco: negocio.endereco ?? null,
       });
 

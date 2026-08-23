@@ -23,6 +23,7 @@ export type NegocioCadastrado = {
   id: string;
   nome: string;
   link_avaliacao: string;
+  google_place_id: string | null;
   endereco: string | null;
 };
 
@@ -275,13 +276,33 @@ export function BuscaDeNegocio({
 }
 
 /**
+ * Um negocio e um destino de avaliacao, e nao uma linha da tabela.
+ *
+ * A mesma porta entra na agenda mais de uma vez sem nenhum bug no caminho: a
+ * unicidade do banco e por autor, entao o assinante — que enxerga a conta
+ * inteira — ve o negocio que ele cadastrou e o que o vendedor dele cadastrou
+ * como duas linhas. Para quem esta escolhendo onde a placa vai, sao a mesma
+ * coisa, e duas linhas iguais na tela sao so a chance de tocar na errada.
+ *
+ * A chave e o place id quando existe, porque o mesmo negocio tem mais de um
+ * formato de link valido — `g.page/r/.../review` e `search.google.com/local/
+ * writereview?placeid=...` levam ao mesmo formulario e sao strings diferentes.
+ * Sem place id sobra o proprio link, que e o mais longe que da para ir sem
+ * inventar: dois negocios podem se chamar igual, e juntar por nome esconderia
+ * um deles.
+ */
+function identidade(negocio: NegocioCadastrado): string {
+  return negocio.google_place_id || negocio.link_avaliacao;
+}
+
+/**
  * A agenda: os negocios que ja estao cadastrados.
  *
- * Ao contrario da busca de cliente, aqui a lista aparece antes de qualquer
- * digitacao. Sao coisas diferentes: a agenda de clientes de uma conta rodada
- * tem trezentos nomes, e mostrar seis por acaso nao responde nada. A lista de
- * negocios do vendedor e a rota que ele mesmo montou ontem — os primeiros seis
- * sao, na maior parte dos dias, exatamente as portas em que ele vai bater.
+ * Nada aparece antes da busca, como no cliente. A lista abria com os seis
+ * primeiros, na ideia de que os seis mais recentes seriam a rota de ontem —
+ * mas o que chega na tela e uma parede de nomes parecidos por cima do resto do
+ * popup, e o vendedor precisa rolar por ela para chegar na cor e na quantidade.
+ * Digitar tres letras acha mais rapido do que ler seis linhas.
  */
 function Agenda({
   negocios,
@@ -292,18 +313,31 @@ function Agenda({
 }) {
   const [termo, setTermo] = useState("");
 
-  const encontrados = useMemo(() => {
-    const alvo = termo.trim().toLowerCase();
-    const lista = alvo
-      ? negocios.filter(
-          (negocio) =>
-            negocio.nome.toLowerCase().includes(alvo) ||
-            (negocio.endereco ?? "").toLowerCase().includes(alvo),
-        )
-      : negocios;
+  // O mais recente ganha: a lista chega do servidor por `criado_em desc`, e o
+  // nome que a pessoa escreveu na ultima vez e o que ela espera reconhecer.
+  const agenda = useMemo(() => {
+    const porDestino = new Map<string, NegocioCadastrado>();
+    for (const negocio of negocios) {
+      const chave = identidade(negocio);
+      if (!porDestino.has(chave)) porDestino.set(chave, negocio);
+    }
+    return [...porDestino.values()];
+  }, [negocios]);
 
-    return lista.slice(0, CABEM_NA_LISTA);
-  }, [termo, negocios]);
+  const procurado = termo.trim();
+
+  const encontrados = useMemo(() => {
+    if (!procurado) return [];
+
+    const alvo = procurado.toLowerCase();
+    return agenda
+      .filter(
+        (negocio) =>
+          negocio.nome.toLowerCase().includes(alvo) ||
+          (negocio.endereco ?? "").toLowerCase().includes(alvo),
+      )
+      .slice(0, CABEM_NA_LISTA);
+  }, [procurado, agenda]);
 
   return (
     <>
@@ -327,7 +361,12 @@ function Agenda({
         )}
       />
 
-      {encontrados.length === 0 ? (
+      {!procurado ? (
+        <p className="text-xs text-tinta-suave">
+          Digite o nome ou o endereço para achar entre os seus {agenda.length}{" "}
+          {agenda.length === 1 ? "negócio" : "negócios"}.
+        </p>
+      ) : encontrados.length === 0 ? (
         <p className="text-xs text-tinta-suave">
           Nenhum negócio com esse nome. Pesquise no Google para cadastrar um novo.
         </p>
@@ -342,6 +381,7 @@ function Agenda({
                     id: negocio.id,
                     nome: negocio.nome,
                     linkAvaliacao: negocio.link_avaliacao,
+                    placeId: negocio.google_place_id ?? undefined,
                     endereco: negocio.endereco ?? undefined,
                   })
                 }

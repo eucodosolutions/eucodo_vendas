@@ -42,7 +42,7 @@ export default async function PaginaVender() {
       // recente, que e a ordem em que a rota foi cadastrada.
       supabase
         .from("negocios")
-        .select("id, nome, link_avaliacao, endereco")
+        .select("id, nome, link_avaliacao, google_place_id, endereco")
         .order("criado_em", { ascending: false })
         .limit(300)
         .returns<NegocioCadastrado[]>(),
