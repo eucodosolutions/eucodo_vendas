@@ -8,7 +8,6 @@
  */
 
 export type PapelUsuario = "admin" | "assinante" | "vendedor";
-export type StatusUsuario = "pendente" | "ativo" | "bloqueado";
 export type StatusAssinatura = "pendente" | "ativa" | "suspensa" | "cancelada";
 export type CorArte = "branco" | "preto";
 export type TecnologiaArte = "qr" | "qr_nfc";
@@ -38,7 +37,13 @@ export type Perfil = {
   email: string;
   whatsapp: string | null;
   papel: PapelUsuario;
-  status: StatusUsuario;
+  /**
+   * Bloqueio individual, nada mais.
+   *
+   * Quem decide se a conta abre e `Assinatura.status`. Este campo existe para
+   * tirar UMA pessoa do ar sem derrubar a equipe inteira junto.
+   */
+  ativo: boolean;
   /** Conta a que a pessoa pertence. Nulo so no admin da plataforma. */
   assinatura_id: string | null;
   senha_temporaria: boolean;
@@ -207,7 +212,6 @@ export type Configuracoes = {
   pix_chave: string | null;
   pix_beneficiario: string | null;
   pix_cidade: string | null;
-  prazo_producao_dias: number;
   atualizado_em: string;
 };
 
@@ -276,7 +280,6 @@ export type Database = {
     };
     Enums: {
       papel_usuario: PapelUsuario;
-      status_usuario: StatusUsuario;
       status_assinatura: StatusAssinatura;
       cor_arte: CorArte;
       tecnologia_arte: TecnologiaArte;

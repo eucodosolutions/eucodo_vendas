@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { EtiquetaPagamento, EtiquetaStatus } from "@/components/etiquetas";
+import { CabecalhoDePagina } from "@/components/ui/cabecalho-de-pagina";
+import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { LinkBotao } from "@/components/ui/link-botao";
 import { dataHora, moeda, whatsappLegivel } from "@/lib/formato";
 import { sessaoDoPainel } from "@/lib/supabase/painel";
@@ -56,24 +58,21 @@ export default async function PaginaPedidos() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-tinta">Pedidos</h1>
-          <p className="mt-1 text-sm text-tinta-suave">
-            {pedidos.length === 0
-              ? "Nenhum pedido ainda."
-              : `${pedidos.length} pedido${pedidos.length > 1 ? "s" : ""}, ${moeda(aReceber)} ${ehVendedor ? "de comissão " : ""}a receber.`}
-          </p>
-        </div>
-        <LinkBotao href="/vender">Novo pedido</LinkBotao>
-      </header>
+      <CabecalhoDePagina
+        titulo="Pedidos"
+        descricao={
+          pedidos.length === 0
+            ? "Nenhum pedido ainda."
+            : `${pedidos.length} pedido${pedidos.length > 1 ? "s" : ""}, ${moeda(aReceber)} ${ehVendedor ? "de comissão " : ""}a receber.`
+        }
+        acao={<LinkBotao href="/vender">Novo pedido</LinkBotao>}
+      />
 
       {pedidos.length === 0 ? (
-        <div className="rounded-card border border-dashed border-borda-forte bg-superficie p-10 text-center">
-          <p className="text-sm text-tinta-suave">
-            Os pedidos aparecem aqui assim que a primeira venda for fechada.
-          </p>
-        </div>
+        <EstadoVazio
+          mensagem="Os pedidos aparecem aqui assim que a primeira venda for fechada."
+          acao={<LinkBotao href="/vender">Fechar a primeira venda</LinkBotao>}
+        />
       ) : (
         <ul className="flex flex-col gap-3">
           {pedidos.map((pedido) => (

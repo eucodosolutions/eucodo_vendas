@@ -3,14 +3,16 @@
 import { Trash2 } from "lucide-react";
 import { useActionState, useState } from "react";
 
-import { removerProduto, salvarProduto, type EstadoAjustes } from "./actions";
-import { useAviso } from "@/components/ui/avisos";
+import { FotoDoProduto } from "./foto-do-produto";
+import { removerProduto, salvarProduto, type EstadoProduto } from "./actions";
+import { useAoDarCerto } from "@/components/ui/avisos";
 import { Botao } from "@/components/ui/botao";
 import { Campo, CampoTexto } from "@/components/ui/campo";
+import { Confirmacao } from "@/components/ui/confirmacao";
 import { Escolha } from "@/components/ui/escolha";
-import { Secao } from "@/components/ui/secao";
+import { ModalDeFormulario } from "@/components/ui/modal-de-formulario";
 import { CORES, DETALHE_DO_TIPO, TECNOLOGIAS, TIPOS } from "@/lib/catalogo";
-import { moeda, ROTULO_COR, ROTULO_TECNOLOGIA, ROTULO_TIPO_PRODUTO } from "@/lib/formato";
+import { ROTULO_COR, ROTULO_TECNOLOGIA, ROTULO_TIPO_PRODUTO } from "@/lib/formato";
 import type { CorArte, TecnologiaArte, TipoProduto } from "@/types/database";
 
 export type ProdutoEditavel = {
@@ -35,67 +37,78 @@ export type ProdutoEditavel = {
   } | null;
 };
 
+/** Prazo sugerido para produto novo. O prazo que vale e sempre o do produto. */
+const PRAZO_SUGERIDO = 3;
+
 /**
- * Cadastro de produto, com os campos que o tipo pede e mais nenhum.
+ * Cadastro de produto em popup, com os campos que o tipo pede e mais nenhum.
  *
  * O tipo so e escolhido na criacao. Trocar o tipo de um produto ja vendido nao
  * tem resposta boa: os itens antigos guardam o retrato do que foi vendido, e o
  * produto passaria a contradizer o proprio historico.
  */
-export function FormularioProduto({
+export function ModalProduto({
+  aberto,
+  aoFechar,
   produto,
-  prazoPadrao,
 }: {
+  aberto: boolean;
+  aoFechar: () => void;
   produto?: ProdutoEditavel;
-  prazoPadrao: number;
 }) {
-  const [estado, acao] = useActionState<EstadoAjustes, FormData>(salvarProduto, {});
-  const [estadoRemocao, acaoRemocao] = useActionState<EstadoAjustes, FormData>(removerProduto, {});
+  const [estado, acao, salvando] = useActionState<EstadoProduto, FormData>(salvarProduto, {});
+  const [estadoRemocao, acaoRemocao, removendo] = useActionState<EstadoProduto, FormData>(
+    removerProduto,
+    {},
+  );
 
-  useAviso(estado);
-  useAviso(estadoRemocao);
-
-  const [aberto, setAberto] = useState(!produto);
   const [tipo, setTipo] = useState<TipoProduto>(produto?.tipo ?? "avaliacao");
   const [foto, setFoto] = useState<string | null>(produto?.foto_url ?? null);
+  const [confirmandoRemocao, setConfirmandoRemocao] = useState(false);
 
   const avaliacao = tipo === "avaliacao";
   const medidas = produto?.produto_avaliacao;
 
-  if (!aberto && produto) {
-    return (
-      <Secao>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-base font-medium text-tinta">
-              {produto.nome}
-              {produto.ativo ? "" : " (fora da venda)"}
-            </p>
-            <p className="text-sm text-tinta-suave tabular-nums">
-              {ROTULO_TIPO_PRODUTO[produto.tipo]} · {moeda(produto.preco_centavos)} ·{" "}
-              {produto.comissao_percentual}% de comissão
-            </p>
-          </div>
-          <Botao type="button" variante="secundario" onClick={() => setAberto(true)}>
-            Editar
-          </Botao>
-        </div>
-      </Secao>
-    );
-  }
+  // Removido o produto, nao ha mais o que editar atras da confirmacao.
+  useAoDarCerto(estadoRemocao, aoFechar);
 
   return (
-    <Secao titulo={produto ? produto.nome : "Novo produto"}>
-      <form action={acao} className="flex flex-col gap-5">
+    <>
+      {/* O popup do cadastro fica montado atras da confirmacao, e nao e trocado
+          por ela: quem desistir de remover volta com o formulario do jeito que
+          deixou, e nao com os campos recarregados do zero. */}
+      <ModalDeFormulario
+        aberto={aberto}
+        aoFechar={aoFechar}
+        titulo={produto ? produto.nome : "Novo produto"}
+        descricao={
+          produto
+            ? `${ROTULO_TIPO_PRODUTO[tipo]} · o tipo não muda depois do cadastro.`
+            : undefined
+        }
+        tamanho="largo"
+        acao={acao}
+        estado={estado}
+        pendente={salvando}
+        salvarRotulo={produto ? "Salvar produto" : "Cadastrar produto"}
+        acaoSecundaria={
+          produto ? (
+            <Botao
+              type="button"
+              variante="fantasma"
+              onClick={() => setConfirmandoRemocao(true)}
+              disabled={salvando}
+            >
+              <Trash2 size={16} aria-hidden />
+              Remover
+            </Botao>
+          ) : undefined
+        }
+      >
         {produto ? <input type="hidden" name="id" value={produto.id} /> : null}
         <input type="hidden" name="tipo" value={tipo} />
 
-        {produto ? (
-          <p className="text-sm text-tinta-suave">
-            Tipo: <strong className="font-medium text-tinta">{ROTULO_TIPO_PRODUTO[tipo]}</strong>. O
-            tipo não muda depois do cadastro.
-          </p>
-        ) : (
+        {produto ? null : (
           <Escolha
             titulo="Tipo de produto"
             opcoes={TIPOS.map((valor) => ({
@@ -108,7 +121,7 @@ export function FormularioProduto({
           />
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Campo
             rotulo="Código"
             name="codigo"
@@ -148,8 +161,9 @@ export function FormularioProduto({
             min={0}
             max={365}
             placeholder="3"
-            defaultValue={produto?.prazo_entrega_dias ?? prazoPadrao}
+            defaultValue={produto?.prazo_entrega_dias ?? PRAZO_SUGERIDO}
             required
+            ajuda="O pedido sai quando o item mais lento fica pronto."
           />
           <label className="flex items-center gap-2 self-end pb-2.5 text-sm font-medium text-tinta">
             <input
@@ -180,7 +194,7 @@ export function FormularioProduto({
             <legend className="mb-3 text-xs font-semibold tracking-wide text-tinta-suave uppercase">
               Medidas da placa
             </legend>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Campo
                 rotulo="Largura (mm)"
                 name="largura"
@@ -245,79 +259,23 @@ export function FormularioProduto({
         ) : (
           <FotoDoProduto foto={foto} aoTrocar={setFoto} fotoAtual={produto?.foto_url ?? null} />
         )}
-
-        <div className="flex flex-wrap justify-between gap-3">
-          {produto ? (
-            <Botao type="button" variante="fantasma" onClick={() => setAberto(false)}>
-              Fechar
-            </Botao>
-          ) : (
-            <span />
-          )}
-          <Botao type="submit" carregandoTexto="Salvando...">
-            {produto ? "Salvar produto" : "Cadastrar produto"}
-          </Botao>
-        </div>
-      </form>
+      </ModalDeFormulario>
 
       {produto ? (
-        <form action={acaoRemocao} className="mt-4 flex justify-end border-t border-borda pt-4">
-          <input type="hidden" name="id" value={produto.id} />
-          <Botao type="submit" variante="fantasma" carregandoTexto="Removendo...">
-            <Trash2 size={16} aria-hidden />
-            Remover produto
-          </Botao>
-        </form>
+        <Confirmacao
+          aberto={confirmandoRemocao}
+          aoFechar={() => setConfirmandoRemocao(false)}
+          titulo={`Remover ${produto.nome}?`}
+          mensagem="O produto sai do catálogo para sempre. Se ele já foi vendido, o sistema não deixa apagar: desmarque “Ativo na venda” para tirá-lo da tela de venda sem perder o histórico."
+          acao={acaoRemocao}
+          estado={estadoRemocao}
+          pendente={removendo}
+          confirmarRotulo="Remover produto"
+          carregandoTexto="Removendo..."
+          ocultos={{ id: produto.id }}
+        />
       ) : null}
-    </Secao>
-  );
-}
-
-/** Foto do produto padrao, com previa local antes de subir. */
-function FotoDoProduto({
-  foto,
-  fotoAtual,
-  aoTrocar,
-}: {
-  foto: string | null;
-  fotoAtual: string | null;
-  aoTrocar: (url: string | null) => void;
-}) {
-  return (
-    <fieldset className="border-t border-borda pt-4">
-      <legend className="mb-3 text-xs font-semibold tracking-wide text-tinta-suave uppercase">
-        Foto
-      </legend>
-      <div className="flex flex-wrap items-start gap-4">
-        {foto ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={foto} alt="" className="size-24 rounded-lg border border-borda object-cover" />
-        ) : (
-          <div className="flex size-24 items-center justify-center rounded-lg border border-dashed border-borda text-xs text-tinta-suave">
-            Sem foto
-          </div>
-        )}
-        <div className="flex-1">
-          <label htmlFor="foto" className="text-rotulo font-medium text-tinta">
-            Imagem do produto
-          </label>
-          <input
-            id="foto"
-            name="foto"
-            type="file"
-            accept="image/*"
-            onChange={(evento) => {
-              const arquivo = evento.target.files?.[0];
-              aoTrocar(arquivo ? URL.createObjectURL(arquivo) : fotoAtual);
-            }}
-            className="mt-1.5 block w-full text-sm text-tinta-suave file:mr-3 file:cursor-pointer file:rounded-lg file:border file:border-borda file:bg-superficie file:px-3 file:py-2 file:text-sm file:font-medium file:text-tinta hover:file:border-borda-forte"
-          />
-          <p className="mt-1.5 text-xs text-tinta-suave">
-            JPG ou PNG, até 5 MB. É a foto que o cliente vê na venda.
-          </p>
-        </div>
-      </div>
-    </fieldset>
+    </>
   );
 }
 

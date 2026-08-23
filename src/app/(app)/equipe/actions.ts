@@ -42,9 +42,7 @@ async function sessaoDeAssinante() {
   const sessao = await sessaoDoPainel();
 
   const dono =
-    sessao?.perfil.papel === "assinante" && sessao.perfil.status === "ativo"
-      ? sessao.perfil
-      : null;
+    sessao?.perfil.papel === "assinante" && sessao.perfil.ativo ? sessao.perfil : null;
 
   return { supabase, dono };
 }

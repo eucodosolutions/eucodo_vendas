@@ -13,6 +13,7 @@ import {
 import { useAviso } from "@/components/ui/avisos";
 import { Botao } from "@/components/ui/botao";
 import { Campo } from "@/components/ui/campo";
+import { Confirmacao } from "@/components/ui/confirmacao";
 import { Secao } from "@/components/ui/secao";
 import { Selecao } from "@/components/ui/selecao";
 import { ROTULO_PAGAMENTO, ROTULO_STATUS } from "@/lib/formato";
@@ -48,15 +49,18 @@ export function AcoesDoPedido({
 }) {
   const [estadoStatus, acaoStatus] = useActionState<EstadoAcao, FormData>(mudarStatus, {});
   const [estadoPagamento, acaoPagamento] = useActionState<EstadoAcao, FormData>(marcarPago, {});
-  const [estadoCancelar, acaoCancelar] = useActionState<EstadoAcao, FormData>(cancelarPedido, {});
+  const [estadoCancelar, acaoCancelar, cancelando] = useActionState<EstadoAcao, FormData>(
+    cancelarPedido,
+    {},
+  );
   const [estadoArte, acaoArte] = useActionState<EstadoAcao, FormData>(regerarArte, {});
   const [estadoEnvio, acaoEnvio] = useActionState<EstadoAcao, FormData>(reenviarMensagem, {});
 
   // Cada acao avisa por conta propria. O toast que traz o link do WhatsApp
   // carrega o botao de abrir a conversa, entao nada precisa ficar na tela.
+  // O cancelamento fica de fora: quem avisa por ele e a propria `Confirmacao`.
   useAviso(estadoStatus);
   useAviso(estadoPagamento);
-  useAviso(estadoCancelar);
   useAviso(estadoArte);
   useAviso(estadoEnvio);
 
@@ -123,35 +127,35 @@ export function AcoesDoPedido({
           </form>
         </div>
 
-        {mostrarCancelamento ? (
-          <form action={acaoCancelar} className="flex flex-col gap-3 border-t border-borda pt-4">
-            <input type="hidden" name="pedidoId" value={pedidoId} />
-            <Campo
-              rotulo="Por que este pedido está sendo cancelado?"
-              name="motivo"
-              required
-              minLength={3}
-              placeholder="Cliente desistiu, dado errado, pagamento não veio"
-            />
-            <div className="flex flex-wrap gap-3">
-              <Botao type="submit" variante="secundario" carregandoTexto="Cancelando...">
-                Confirmar cancelamento
-              </Botao>
-              <Botao type="button" variante="fantasma" onClick={() => setMostrarCancelamento(false)}>
-                Deixar como está
-              </Botao>
-            </div>
-          </form>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setMostrarCancelamento(true)}
-            className="self-start text-sm font-medium text-erro hover:underline"
-          >
-            Cancelar pedido
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setMostrarCancelamento(true)}
+          className="self-start text-sm font-medium text-erro hover:underline"
+        >
+          Cancelar pedido
+        </button>
       </div>
+
+      <Confirmacao
+        aberto={mostrarCancelamento}
+        aoFechar={() => setMostrarCancelamento(false)}
+        titulo="Cancelar este pedido?"
+        mensagem="O pedido para de andar: não dá mais para mudar status nem baixar pagamento. O motivo fica no histórico."
+        acao={acaoCancelar}
+        estado={estadoCancelar}
+        pendente={cancelando}
+        confirmarRotulo="Confirmar cancelamento"
+        carregandoTexto="Cancelando..."
+        ocultos={{ pedidoId }}
+      >
+        <Campo
+          rotulo="Por que este pedido está sendo cancelado?"
+          name="motivo"
+          required
+          minLength={3}
+          placeholder="Cliente desistiu, dado errado, pagamento não veio"
+        />
+      </Confirmacao>
     </Secao>
   );
 }

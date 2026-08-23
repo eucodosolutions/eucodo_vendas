@@ -3,6 +3,8 @@ import Link from "next/link";
 
 import { AcoesDaAssinatura } from "./acoes-da-assinatura";
 import { EtiquetaAssinatura } from "@/components/etiquetas";
+import { CabecalhoDePagina } from "@/components/ui/cabecalho-de-pagina";
+import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Secao } from "@/components/ui/secao";
 import { data, whatsappLegivel } from "@/lib/formato";
 import { createClient } from "@/lib/supabase/server";
@@ -10,7 +12,7 @@ import type { Assinatura, Perfil, StatusAssinatura } from "@/types/database";
 
 export const metadata: Metadata = { title: "Assinantes" };
 
-type MembroDaConta = Pick<Perfil, "id" | "nome" | "email" | "whatsapp" | "papel" | "status">;
+type MembroDaConta = Pick<Perfil, "id" | "nome" | "email" | "whatsapp" | "papel" | "ativo">;
 
 type LinhaAssinatura = Pick<Assinatura, "id" | "nome" | "status" | "criado_em"> & {
   perfis: MembroDaConta[];
@@ -32,7 +34,7 @@ export default async function PaginaAssinantes({ searchParams }: PageProps<"/adm
 
   let consulta = supabase
     .from("assinaturas")
-    .select("id, nome, status, criado_em, perfis (id, nome, email, whatsapp, papel, status)")
+    .select("id, nome, status, criado_em, perfis (id, nome, email, whatsapp, papel, ativo)")
     .order("criado_em", { ascending: false })
     .limit(200);
 
@@ -45,14 +47,14 @@ export default async function PaginaAssinantes({ searchParams }: PageProps<"/adm
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-tinta">Assinantes</h1>
-        <p className="mt-1 text-sm text-tinta-suave">
-          {contas.length === 0
+      <CabecalhoDePagina
+        titulo="Assinantes"
+        descricao={
+          contas.length === 0
             ? "Nenhuma conta neste filtro."
-            : `${contas.length} conta${contas.length > 1 ? "s" : ""} listada${contas.length > 1 ? "s" : ""}.`}
-        </p>
-      </header>
+            : `${contas.length} conta${contas.length > 1 ? "s" : ""} listada${contas.length > 1 ? "s" : ""}.`
+        }
+      />
 
       <nav className="flex flex-wrap gap-2">
         {FILTROS.map((opcao) => {
@@ -75,11 +77,7 @@ export default async function PaginaAssinantes({ searchParams }: PageProps<"/adm
       </nav>
 
       {contas.length === 0 ? (
-        <div className="rounded-card border border-dashed border-borda-forte bg-superficie p-10 text-center">
-          <p className="text-sm text-tinta-suave">
-            As contas aparecem aqui assim que alguém se cadastrar pela página.
-          </p>
-        </div>
+        <EstadoVazio mensagem="As contas aparecem aqui assim que alguém se cadastrar pela página." />
       ) : (
         <div className="flex flex-col gap-3">
           {contas.map((conta) => {

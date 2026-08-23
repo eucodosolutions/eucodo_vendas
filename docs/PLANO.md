@@ -78,7 +78,8 @@ Pagamento em trilha separada: `pendente` / `pago`, com forma (pix, dinheiro, car
 Tudo em portugues, e quase tudo com dono (`assinatura_id`):
 
 - `assinaturas`: a conta. Nome e status (pendente, ativa, suspensa, cancelada)
-- `perfis`: pessoa, papel, status, conta, senha provisoria
+- `perfis`: pessoa, papel, conta, senha provisoria e `ativo` (bloqueio individual;
+  quem libera a conta e o status da assinatura)
 - `catalogo_modelo`: semente sem dono, copiada para cada conta nova
 - `produtos`: o catalogo da conta (tipo, codigo, nome, descricao, foto, preco,
   comissao, prazo)
@@ -90,7 +91,8 @@ Tudo em portugues, e quase tudo com dono (`assinatura_id`):
 - `pedido_eventos`: auditoria de mudanca de status
 - `mensagens_whatsapp`: log de envio (corpo, resposta da uazapi, erro)
 - `modelos_mensagem`: texto por evento. **Ainda global**, e a proxima divida do microsaas
-- `configuracoes`: uma linha por conta, com PIX, prazo e instancia de WhatsApp
+- `configuracoes`: uma linha por conta, com PIX e instancia de WhatsApp. O prazo saiu
+  daqui: e dado do produto, e o pedido herda o maior entre os itens
 - `instancias_whatsapp`: fornecidas pela plataforma, token cifrado no Vault
 
 ## Auth e papeis
@@ -103,14 +105,19 @@ Tres papeis, e dois paineis:
   Dashboard com assinantes por status, volume do mes contra o anterior, ranking e atividade
   recente; e a tela de assinantes, onde o status de cada conta muda.
 - **Assinante** e quem se cadastra pela pagina. Dono da conta: catalogo, clientes, equipe e
-  configuracoes sao dele. Nasce `pendente` e so entra quando o admin libera.
+  configuracoes sao dele. A conta dele nasce `pendente` e so entra quando o admin libera a
+  assinatura em `/admin/assinantes` — nao existe um segundo estado no perfil para liberar
+  junto, justamente porque um deles sempre ficava para tras.
 - **Vendedor** e criado pelo assinante em `/equipe`, ja preso a assinatura dele. Ve so os
-  pedidos que abriu e os clientes que cadastrou, nao edita cliente e nao entra em Ajustes.
+  pedidos que abriu e os clientes que cadastrou, nao edita cliente e nao entra em Produtos
+  nem em Ajustes.
   A senha vem gerada pela Edge Function `equipe`, aparece uma vez para o dono copiar e
   mandar no WhatsApp, e a troca e obrigatoria no primeiro acesso.
 
-Suspender uma assinatura derruba a equipe junto: `usuario_ativo()` exige perfil liberado
-**e** assinatura ativa, entao a regra mora num lugar so.
+Suspender uma assinatura derruba a equipe junto: `usuario_ativo()` exige `perfis.ativo`
+**e** assinatura ativa, entao a regra mora num lugar so. Do lado da aplicacao, quem
+responde e `motivoDoBloqueio()`, usada tanto pelo login quanto pelo layout do painel —
+antes eram duas copias, e elas discordavam.
 
 ## Assinaturas e dados por conta
 
@@ -143,7 +150,7 @@ aplicacao.
 Percentual **por produto** (`produtos.comissao_percentual`), e nao mais por vendedor: um
 item de margem alta pode pagar mais que outro no mesmo pedido. O gatilho
 `carimbar_item_do_pedido` grava o percentual e o valor em cada linha no momento da venda, e
-`recalcular_pedido` soma em `pedidos.comissao_centavos`. Mexer no percentual em Ajustes vale
+`recalcular_pedido` soma em `pedidos.comissao_centavos`. Mexer no percentual em Produtos vale
 para as proximas vendas e nao alcanca pedido fechado.
 
 Comissao so existe quando quem abriu o pedido e vendedor: pedido do proprio assinante, ou
@@ -188,6 +195,7 @@ Tudo salvo no Supabase Storage, em bucket privado com URL assinada.
 10. [feito] Equipe: vendedor cadastrado pelo assinante, e acerto de comissao
 11. [feito] Multiassinatura: papeis, painel admin, clientes, carrinho, navegacao e PWA
 12. [feito] Produto por tipo: placa de avaliacao e padrao, comissao e prazo no produto
+13. [feito] Acesso so pela assinatura, Produtos em aba propria e cadastro em popup
 
 Passo a passo para subir o ambiente: `docs/CONFIGURACAO.md`.
 
@@ -197,7 +205,7 @@ Passo a passo para subir o ambiente: `docs/CONFIGURACAO.md`.
 - Chave PIX + nome e cidade do recebedor
 - uazapi: host do servidor e token da instancia
 - Google Places API key
-- Prazo de producao e regra de entrega/frete
+- Regra de entrega e frete (o prazo ja e por produto)
 - Confirmar a medida do A6: os px enviados (1216,54 x 1724,41) equivalem a
   103 x 146 mm, e nao aos 107 x 150 mm informados. O A5 ja fechou em 150 x 212 mm.
 - Confirmar se a arte ocupa o A5/A6 inteiro ou tem area util menor no display

@@ -83,3 +83,22 @@ export function useAviso(estado: EstadoComAviso) {
     avisar.sucesso(estado.sucesso);
   }, [estado]);
 }
+
+/**
+ * Roda uma vez a cada sucesso novo de server action.
+ *
+ * E o que fecha popup depois de salvar e o que leva embora quem apagou o
+ * registro que estava vendo. Compara a identidade do objeto, e nao o conteudo,
+ * pelo mesmo motivo do `useAviso`: o `useActionState` devolve um objeto novo
+ * por resposta, entao dois sucessos iguais em sequencia contam como dois.
+ */
+export function useAoDarCerto(estado: EstadoComAviso, aoDarCerto: () => void) {
+  const ultimo = useRef<EstadoComAviso | null>(null);
+
+  useEffect(() => {
+    if (estado === ultimo.current) return;
+    ultimo.current = estado;
+
+    if (estado.sucesso) aoDarCerto();
+  }, [estado, aoDarCerto]);
+}

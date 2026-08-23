@@ -5,8 +5,8 @@ import { z } from "zod";
 
 import { MOTIVO_DE_ACESSO } from "@/lib/acesso";
 import { normalizarWhatsapp } from "@/lib/formato";
+import { motivoDoBloqueio, sessaoDoPainel } from "@/lib/supabase/painel";
 import { createClient } from "@/lib/supabase/server";
-import type { PapelUsuario } from "@/types/database";
 
 export type EstadoFormulario = {
   erro?: string;
@@ -73,33 +73,24 @@ export async function entrar(
     };
   }
 
-  // O cadastro e aberto, o acesso nao. Sao dois portoes: o perfil precisa estar
-  // liberado, e a assinatura precisa estar ativa. Suspender uma conta derruba o
-  // assinante e a equipe dele de uma vez.
-  const { data: perfil } = await supabase
-    .from("perfis")
-    .select("papel, status, assinaturas (status)")
-    .eq("id", data.user.id)
-    .single<{ papel: PapelUsuario; status: string; assinaturas: { status: string } | null }>();
+  // O cadastro e aberto, o acesso nao: quem libera a conta e a assinatura. A
+  // regra inteira mora em `motivoDoBloqueio`, a mesma que o layout do painel
+  // usa, para o login e o painel nunca discordarem sobre quem entra.
+  const sessao = await sessaoDoPainel();
 
-  if (!perfil || perfil.status !== "ativo") {
+  if (!sessao) {
     await supabase.auth.signOut();
-    return {
-      erro:
-        perfil?.status === "bloqueado"
-          ? "Este acesso foi bloqueado. Fale com quem cuida da conta."
-          : "Seu acesso ainda não foi liberado.",
-    };
+    return { erro: "Não encontrei o seu perfil. Fale com a Eucodo." };
   }
 
-  if (perfil.papel === "admin") redirect("/admin");
+  const bloqueio = motivoDoBloqueio(sessao);
 
-  const conta = perfil.assinaturas ? `conta_${perfil.assinaturas.status}` : null;
-
-  if (conta !== "conta_ativa") {
+  if (bloqueio) {
     await supabase.auth.signOut();
-    return { erro: MOTIVO_DE_ACESSO[conta ?? "conta_pendente"] ?? MOTIVO_DE_ACESSO.conta_pendente };
+    return { erro: MOTIVO_DE_ACESSO[bloqueio] ?? MOTIVO_DE_ACESSO.acesso_bloqueado };
   }
+
+  if (sessao.perfil.papel === "admin") redirect("/admin");
 
   const proxima = String(dados.get("proxima") ?? "");
   redirect(proxima.startsWith("/") ? proxima : "/vender");
@@ -138,9 +129,15 @@ export async function criarConta(
     return { erro: "Não consegui criar a conta. Tente de novo em instantes." };
   }
 
+  // A confirmacao por e-mail esta desligada, entao o signUp ja devolve sessao e
+  // grava o cookie aqui mesmo. Uma sessao que ainda nao tem para onde ir so
+  // serve para prender a pessoa entre o login e o painel, os dois desviando um
+  // para o outro. Melhor sair limpo e voltar quando a conta estiver liberada.
+  await supabase.auth.signOut();
+
   return {
     sucesso:
-      "Conta criada. A Eucodo precisa liberar sua assinatura antes do primeiro acesso.",
+      "Conta criada. A Eucodo precisa liberar sua assinatura antes do primeiro acesso — assim que isso acontecer, é só entrar com o seu e-mail e senha.",
   };
 }
 
