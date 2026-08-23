@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { renderPreviewPng, renderPrintJpg } from "@/lib/art/render";
-import { specDoTamanho } from "@/lib/art/spec";
+import { specDoProduto } from "@/lib/art/spec";
 import { createClient } from "@/lib/supabase/server";
 import { enviarWhatsapp, type ChaveMensagem } from "@/lib/whatsapp/enviar";
-import type { FormaPagamento, StatusPedido } from "@/types/database";
+import type { FormaPagamento, PedidoItem, StatusPedido } from "@/types/database";
 
 export type EstadoAcao = {
   erro?: string;
@@ -230,7 +230,26 @@ function mensagemDeEnvio(
     : `${base} Não consegui avisar o cliente.`;
 }
 
-/** Refaz os arquivos da arte. Serve quando a geracao falhou na hora da venda. */
+/**
+ * Refaz os arquivos de arte do pedido, item por item.
+ *
+ * Serve quando a geracao falhou na hora da venda, e quando o pedido tem varias
+ * placas e so uma delas ficou sem arquivo. Cada item tem a propria arte, entao
+ * cada item e regerado com os dados que ficaram guardados nele.
+ */
+type ProdutoParaArte = {
+  id: string;
+  codigo: string;
+  nome: string;
+  produto_avaliacao: {
+    largura_mm: number;
+    altura_mm: number;
+    margem_seguranca_mm: number;
+    sangria_mm: number;
+    dpi: number;
+  } | null;
+};
+
 export async function regerarArte(_estado: EstadoAcao, dados: FormData): Promise<EstadoAcao> {
   const pedidoId = z.string().uuid().safeParse(dados.get("pedidoId"));
   if (!pedidoId.success) return { erro: "Pedido inválido." };
@@ -240,53 +259,92 @@ export async function regerarArte(_estado: EstadoAcao, dados: FormData): Promise
 
   const { data: pedido } = await supabase
     .from("pedidos")
-    .select("id, codigo, nome_negocio, link_avaliacao, cor, tecnologia, tamanho_codigo")
+    .select("id, codigo, assinatura_id, pedido_itens (*)")
     .eq("id", pedidoId.data)
-    .single();
+    .single<{ id: string; codigo: string; assinatura_id: string; pedido_itens: PedidoItem[] }>();
 
   if (!pedido) return { erro: "Pedido não encontrado." };
 
-  const { data: tamanho } = await supabase
-    .from("tamanhos")
-    .select("codigo, rotulo, largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi")
-    .eq("codigo", pedido.tamanho_codigo)
-    .single();
+  // Produto padrao nao tem arte: sobra so o que foi vendido como placa.
+  const placas = pedido.pedido_itens.filter((item) => item.tipo === "avaliacao");
 
-  if (!tamanho) return { erro: "O tamanho deste pedido não existe mais no cadastro." };
+  if (placas.length === 0) {
+    return { erro: "Este pedido não tem nenhuma placa para gerar arte." };
+  }
 
-  try {
-    const arte = {
-      spec: specDoTamanho(tamanho),
-      color: pedido.cor,
-      tech: pedido.tecnologia,
-      businessName: pedido.nome_negocio,
-      reviewUrl: pedido.link_avaliacao,
-    };
+  const ids = [...new Set(placas.map((item) => item.produto_id))];
 
-    const [jpg, previa] = await Promise.all([renderPrintJpg(arte), renderPreviewPng(arte)]);
-    const base = `pedidos/${pedido.codigo}`;
+  const { data: produtos } = await supabase
+    .from("produtos")
+    .select(
+      "id, codigo, nome, produto_avaliacao (largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi)",
+    )
+    .in("id", ids)
+    .returns<ProdutoParaArte[]>();
 
-    await supabase.storage
-      .from("artes")
-      .upload(`${base}/arte.jpg`, jpg, { contentType: "image/jpeg", upsert: true });
-    await supabase.storage
-      .from("artes")
-      .upload(`${base}/previa.png`, previa, { contentType: "image/png", upsert: true });
+  const porId = new Map(
+    (produtos ?? [])
+      .filter((produto) => produto.produto_avaliacao !== null)
+      .map((produto) => [produto.id, produto]),
+  );
 
-    await supabase
-      .from("pedidos")
-      .update({
-        arte_jpg_path: `${base}/arte.jpg`,
-        arte_preview_path: `${base}/previa.png`,
-      })
-      .eq("id", pedido.id);
-  } catch (erro) {
-    console.error("Falha ao regerar arte", pedido.codigo, erro);
-    return { erro: "A geração da arte falhou. Confira o link de avaliação." };
+  const faltando = placas.find((item) => !porId.has(item.produto_id));
+  if (faltando) {
+    return { erro: `O produto ${faltando.produto_codigo} não existe mais no seu catálogo.` };
+  }
+
+  let refeitos = 0;
+
+  for (const item of placas) {
+    try {
+      const produto = porId.get(item.produto_id)!;
+      const arte = {
+        spec: specDoProduto(produto, produto.produto_avaliacao!),
+        color: item.cor!,
+        tech: item.tecnologia!,
+        businessName: item.nome_negocio!,
+        reviewUrl: item.link_avaliacao!,
+      };
+
+      const [jpg, previa] = await Promise.all([renderPrintJpg(arte), renderPreviewPng(arte)]);
+      const base = `${pedido.assinatura_id}/${pedido.codigo}/${item.ordem}`;
+
+      await supabase.storage
+        .from("artes")
+        .upload(`${base}/arte.jpg`, jpg, { contentType: "image/jpeg", upsert: true });
+      await supabase.storage
+        .from("artes")
+        .upload(`${base}/previa.png`, previa, { contentType: "image/png", upsert: true });
+
+      await supabase
+        .from("pedido_itens")
+        .update({
+          arte_jpg_path: `${base}/arte.jpg`,
+          arte_preview_path: `${base}/previa.png`,
+        })
+        .eq("id", item.id);
+
+      refeitos += 1;
+    } catch (erro) {
+      console.error("Falha ao regerar arte", pedido.codigo, item.ordem, erro);
+    }
   }
 
   revalidatePath(`/pedidos/${pedido.id}`);
-  return { sucesso: "Arte gerada de novo." };
+
+  if (refeitos === 0) {
+    return { erro: "A geração da arte falhou. Confira os links de avaliação dos itens." };
+  }
+
+  if (refeitos < placas.length) {
+    return {
+      sucesso: `${refeitos} de ${placas.length} artes foram geradas. Confira o link das que faltaram.`,
+    };
+  }
+
+  return {
+    sucesso: refeitos === 1 ? "Arte gerada de novo." : `${refeitos} artes geradas de novo.`,
+  };
 }
 
 async function registrarEvento({

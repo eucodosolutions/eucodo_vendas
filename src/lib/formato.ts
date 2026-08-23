@@ -111,6 +111,11 @@ export const ROTULO_TECNOLOGIA = {
   qr_nfc: "QR code + aproximação",
 } as const;
 
+export const ROTULO_TIPO_PRODUTO = {
+  avaliacao: "Placa de avaliação",
+  padrao: "Padrão",
+} as const;
+
 export const ROTULO_STATUS = {
   novo: "Novo",
   em_producao: "Em produção",
@@ -125,4 +130,11 @@ export const ROTULO_PAGAMENTO = {
   cartao_credito: "Cartão de crédito",
   cartao_debito: "Cartão de débito",
   transferencia: "Transferência",
+} as const;
+
+export const ROTULO_STATUS_ASSINATURA = {
+  pendente: "Pendente",
+  ativa: "Ativa",
+  suspensa: "Suspensa",
+  cancelada: "Cancelada",
 } as const;

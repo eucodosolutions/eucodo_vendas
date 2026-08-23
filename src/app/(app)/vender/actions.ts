@@ -3,140 +3,238 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { specDoTamanho } from "@/lib/art/spec";
 import { renderPreviewPng, renderPrintJpg } from "@/lib/art/render";
-import { normalizarWhatsapp, validarLinkAvaliacao } from "@/lib/formato";
+import { specDoProduto } from "@/lib/art/spec";
+import { CORES, TECNOLOGIAS } from "@/lib/catalogo";
+import { validarLinkAvaliacao } from "@/lib/formato";
+import { sessaoDoPainel } from "@/lib/supabase/painel";
 import { createClient } from "@/lib/supabase/server";
 import { enviarWhatsapp } from "@/lib/whatsapp/enviar";
+import type { CorArte, ProdutoAvaliacao, TecnologiaArte } from "@/types/database";
 
 export type EstadoVenda = { erro?: string };
 
+export type ItemParaPedido = {
+  produtoId: string;
+  quantidade: number;
+  cor?: CorArte;
+  tecnologia?: TecnologiaArte;
+  nomeNegocio?: string;
+  linkAvaliacao?: string;
+  placeId?: string;
+};
+
+export type PedidoDoCarrinho = {
+  clienteId: string;
+  observacoes?: string;
+  itens: ItemParaPedido[];
+};
+
 const esquema = z.object({
-  varianteId: z.string().uuid("Escolha um modelo de display."),
-  nomeNegocio: z.string().trim().min(2, "Digite o nome do negócio."),
-  whatsapp: z.string().trim().min(1, "Digite o WhatsApp do cliente."),
-  linkAvaliacao: z.string().trim().min(1, "Cole o link de avaliação do Google."),
-  placeId: z.string().trim().optional(),
-  quantidade: z.coerce.number().int().min(1).max(999),
+  clienteId: z.string().uuid("Escolha o cliente do pedido."),
   observacoes: z.string().trim().max(500).optional(),
+  itens: z
+    .array(
+      z.object({
+        produtoId: z.string().uuid(),
+        quantidade: z.coerce.number().int().min(1).max(999),
+        cor: z.enum(CORES).optional(),
+        tecnologia: z.enum(TECNOLOGIAS).optional(),
+        nomeNegocio: z.string().trim().min(2).optional(),
+        linkAvaliacao: z.string().trim().min(1).optional(),
+        placeId: z.string().trim().optional(),
+      }),
+    )
+    .min(1, "O carrinho está vazio."),
 });
 
-export async function criarPedido(_estado: EstadoVenda, dados: FormData): Promise<EstadoVenda> {
-  const resultado = esquema.safeParse({
-    varianteId: dados.get("varianteId"),
-    nomeNegocio: dados.get("nomeNegocio"),
-    whatsapp: dados.get("whatsapp"),
-    linkAvaliacao: dados.get("linkAvaliacao"),
-    placeId: dados.get("placeId") ?? undefined,
-    quantidade: dados.get("quantidade") ?? 1,
-    observacoes: dados.get("observacoes") ?? undefined,
-  });
+type ProdutoDaVenda = {
+  id: string;
+  tipo: "avaliacao" | "padrao";
+  codigo: string;
+  nome: string;
+  preco_centavos: number;
+  prazo_entrega_dias: number;
+  produto_avaliacao: Pick<
+    ProdutoAvaliacao,
+    | "largura_mm"
+    | "altura_mm"
+    | "margem_seguranca_mm"
+    | "sangria_mm"
+    | "dpi"
+    | "cores"
+    | "tecnologias"
+  > | null;
+};
 
+/**
+ * Fecha o carrinho num pedido.
+ *
+ * Recebe objeto e nao `FormData`: o carrinho e uma lista de itens, e serializar
+ * lista em campo escondido so para caber num formulario seria trabalho a toa.
+ * `useActionState` aceita qualquer payload.
+ *
+ * O total do pedido nao e calculado aqui: quem soma os itens e o gatilho
+ * `recalcular_pedido`, e quem carimba a comissao de cada linha e o
+ * `carimbar_item_do_pedido`. Preco que chega do navegador nunca e usado, so o
+ * que esta no produto no banco.
+ */
+export async function criarPedido(
+  _estado: EstadoVenda,
+  entrada: PedidoDoCarrinho,
+): Promise<EstadoVenda> {
+  const resultado = esquema.safeParse(entrada);
   if (!resultado.success) {
-    return { erro: resultado.error.issues[0]?.message ?? "Confira os dados do pedido." };
+    return { erro: resultado.error.issues[0]?.message ?? "Confira os itens do pedido." };
   }
 
-  const whatsapp = normalizarWhatsapp(resultado.data.whatsapp);
-  if (!whatsapp) {
-    return { erro: "Esse WhatsApp não parece válido. Confira o DDD e o número." };
-  }
+  const { clienteId, observacoes, itens } = resultado.data;
 
-  const linkAvaliacao = validarLinkAvaliacao(resultado.data.linkAvaliacao);
-  if (!linkAvaliacao) {
-    return {
-      erro: "Esse link não parece do Google. Use o link de avaliação do perfil do negócio.",
-    };
-  }
+  const sessao = await sessaoDoPainel();
+  if (!sessao?.perfil.assinatura_id) return { erro: "Sessão expirada. Entre de novo." };
 
+  const assinaturaId = sessao.perfil.assinatura_id;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/entrar");
 
-  const { data: variante, error: erroVariante } = await supabase
-    .from("variantes")
+  const { data: catalogo } = await supabase
+    .from("produtos")
     .select(
-      "id, cor, tecnologia, preco_centavos, tamanhos (codigo, rotulo, largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi)",
+      "id, tipo, codigo, nome, preco_centavos, prazo_entrega_dias, produto_avaliacao (largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi, cores, tecnologias)",
     )
-    .eq("id", resultado.data.varianteId)
+    .in(
+      "id",
+      itens.map((item) => item.produtoId),
+    )
     .eq("ativo", true)
-    .single<{
-      id: string;
-      cor: "branco" | "preto";
-      tecnologia: "qr" | "qr_nfc";
-      preco_centavos: number;
-      tamanhos: {
-        codigo: string;
-        rotulo: string;
-        largura_mm: number;
-        altura_mm: number;
-        margem_seguranca_mm: number;
-        sangria_mm: number;
-        dpi: number;
-      };
-    }>();
+    .returns<ProdutoDaVenda[]>();
 
-  if (erroVariante || !variante) {
-    return { erro: "Esse modelo não está mais disponível. Escolha outro." };
+  const porId = new Map((catalogo ?? []).map((produto) => [produto.id, produto]));
+
+  if (porId.size !== new Set(itens.map((item) => item.produtoId)).size) {
+    return { erro: "Um dos produtos do carrinho saiu do catálogo. Revise os itens." };
   }
 
-  const quantidade = resultado.data.quantidade;
-  const total = variante.preco_centavos * quantidade;
+  // O que o navegador mandou so vale se o produto ainda oferecer aquilo. Sem
+  // esta conferencia, um carrinho velho geraria arte numa cor que saiu de linha.
+  const links: Array<string | null> = [];
+
+  for (const item of itens) {
+    const produto = porId.get(item.produtoId)!;
+    const placa = produto.produto_avaliacao;
+
+    if (produto.tipo === "avaliacao") {
+      if (!placa) return { erro: `${produto.nome} está sem medidas cadastradas.` };
+      if (!item.nomeNegocio || !item.linkAvaliacao) {
+        return { erro: `${produto.nome} precisa do nome do negócio e do link de avaliação.` };
+      }
+      if (!item.cor || !placa.cores.includes(item.cor)) {
+        return { erro: `${produto.nome} não é mais vendido nessa cor. Revise o carrinho.` };
+      }
+      if (!item.tecnologia || !placa.tecnologias.includes(item.tecnologia)) {
+        return { erro: `${produto.nome} não é mais vendido nessa tecnologia. Revise o carrinho.` };
+      }
+
+      const link = validarLinkAvaliacao(item.linkAvaliacao);
+      if (!link) {
+        return {
+          erro: `O link de "${item.nomeNegocio}" não parece do Google. Use o link de avaliação do perfil.`,
+        };
+      }
+      links.push(link);
+    } else {
+      links.push(null);
+    }
+  }
+
+  const { data: cliente } = await supabase
+    .from("clientes")
+    .select("id, nome")
+    .eq("id", clienteId)
+    .single();
+
+  if (!cliente) return { erro: "Esse cliente não está mais na sua lista." };
 
   const { data: pedido, error: erroPedido } = await supabase
     .from("pedidos")
     .insert({
-      variante_id: variante.id,
-      nome_negocio: resultado.data.nomeNegocio,
-      whatsapp,
-      link_avaliacao: linkAvaliacao,
-      google_place_id: resultado.data.placeId || null,
-      tamanho_codigo: variante.tamanhos.codigo,
-      cor: variante.cor,
-      tecnologia: variante.tecnologia,
-      quantidade,
-      preco_unitario_centavos: variante.preco_centavos,
-      total_centavos: total,
-      status: "novo",
-      pagamento: "pendente",
-      forma_pagamento: null,
-      pago_em: null,
-      cancelado_em: null,
-      motivo_cancelamento: null,
-      arte_jpg_path: null,
-      arte_preview_path: null,
+      assinatura_id: assinaturaId,
+      cliente_id: clienteId,
+      criado_por: sessao.perfil.id,
       origem: "painel",
-      criado_por: user.id,
-      observacoes: resultado.data.observacoes || null,
+      observacoes: observacoes || null,
     })
     .select("id, codigo")
     .single();
 
   if (erroPedido || !pedido) {
-    return { erro: "Não consegui gravar o pedido. Tente de novo." };
+    return { erro: "Não consegui abrir o pedido. Tente de novo." };
   }
 
-  await gerarEGuardarArte({
-    supabase,
-    pedidoId: pedido.id,
-    codigo: pedido.codigo,
-    entrada: {
-      spec: specDoTamanho(variante.tamanhos),
-      cor: variante.cor,
-      tecnologia: variante.tecnologia,
-      nomeNegocio: resultado.data.nomeNegocio,
-      linkAvaliacao,
-    },
+  const linhas = itens.map((item, indice) => {
+    const produto = porId.get(item.produtoId)!;
+    const ehPlaca = produto.tipo === "avaliacao";
+
+    return {
+      pedido_id: pedido.id,
+      ordem: indice + 1,
+      produto_id: produto.id,
+      tipo: produto.tipo,
+      nome_negocio: ehPlaca ? item.nomeNegocio! : null,
+      link_avaliacao: links[indice],
+      google_place_id: ehPlaca ? item.placeId || null : null,
+      produto_codigo: produto.codigo,
+      produto_nome: produto.nome,
+      cor: ehPlaca ? item.cor! : null,
+      tecnologia: ehPlaca ? item.tecnologia! : null,
+      quantidade: item.quantidade,
+      preco_unitario_centavos: produto.preco_centavos,
+      prazo_entrega_dias: produto.prazo_entrega_dias,
+      arte_jpg_path: null,
+      arte_preview_path: null,
+    };
   });
+
+  const { data: gravados, error: erroItens } = await supabase
+    .from("pedido_itens")
+    .insert(linhas)
+    .select("id, ordem");
+
+  if (erroItens || !gravados) {
+    // Pedido sem item nenhum e lixo com codigo gasto: melhor apagar.
+    await supabase.from("pedidos").delete().eq("id", pedido.id);
+    return { erro: "Não consegui gravar os itens do pedido. Tente de novo." };
+  }
+
+  const ordemParaId = new Map(gravados.map((item) => [item.ordem, item.id]));
+
+  await Promise.all(
+    linhas
+      .filter((linha) => linha.tipo === "avaliacao")
+      .map((linha) => {
+        const produto = porId.get(linha.produto_id)!;
+
+        return gerarEGuardarArte({
+          supabase,
+          itemId: ordemParaId.get(linha.ordem)!,
+          base: `${assinaturaId}/${pedido.codigo}/${linha.ordem}`,
+          entrada: {
+            spec: specDoProduto(produto, produto.produto_avaliacao!),
+            cor: linha.cor!,
+            tecnologia: linha.tecnologia!,
+            nomeNegocio: linha.nome_negocio!,
+            linkAvaliacao: linha.link_avaliacao!,
+          },
+        });
+      }),
+  );
 
   await supabase.from("pedido_eventos").insert({
     pedido_id: pedido.id,
     tipo: "criado",
     de: null,
     para: "novo",
-    detalhe: `Pedido aberto no painel por ${user.email ?? "usuario"}`,
-    autor_id: user.id,
+    detalhe: `Pedido aberto no painel por ${sessao.perfil.nome} para ${cliente.nome}`,
+    autor_id: sessao.perfil.id,
   });
 
   // A arte sai junto da mensagem. Se nao houver instancia conectada, a pagina
@@ -147,15 +245,15 @@ export async function criarPedido(_estado: EstadoVenda, dados: FormData): Promis
 }
 
 type EntradaArte = {
-  spec: ReturnType<typeof specDoTamanho>;
-  cor: "branco" | "preto";
-  tecnologia: "qr" | "qr_nfc";
+  spec: ReturnType<typeof specDoProduto>;
+  cor: CorArte;
+  tecnologia: TecnologiaArte;
   nomeNegocio: string;
   linkAvaliacao: string;
 };
 
 /**
- * Gera os dois arquivos e guarda no bucket privado.
+ * Gera os dois arquivos de um item e guarda no bucket privado.
  *
  * A falha aqui nao derruba o pedido: o pedido ja esta gravado e a arte pode ser
  * gerada de novo na tela do pedido. Perder a venda por causa de um erro de
@@ -163,13 +261,13 @@ type EntradaArte = {
  */
 async function gerarEGuardarArte({
   supabase,
-  pedidoId,
-  codigo,
+  itemId,
+  base,
   entrada,
 }: {
   supabase: Awaited<ReturnType<typeof createClient>>;
-  pedidoId: string;
-  codigo: string;
+  itemId: string;
+  base: string;
   entrada: EntradaArte;
 }) {
   try {
@@ -183,7 +281,6 @@ async function gerarEGuardarArte({
 
     const [jpg, preview] = await Promise.all([renderPrintJpg(arte), renderPreviewPng(arte)]);
 
-    const base = `pedidos/${codigo}`;
     const caminhoJpg = `${base}/arte.jpg`;
     const caminhoPreview = `${base}/previa.png`;
 
@@ -195,10 +292,10 @@ async function gerarEGuardarArte({
       .upload(caminhoPreview, preview, { contentType: "image/png", upsert: true });
 
     await supabase
-      .from("pedidos")
+      .from("pedido_itens")
       .update({ arte_jpg_path: caminhoJpg, arte_preview_path: caminhoPreview })
-      .eq("id", pedidoId);
+      .eq("id", itemId);
   } catch (erro) {
-    console.error("Falha ao gerar a arte do pedido", codigo, erro);
+    console.error("Falha ao gerar a arte do item", base, erro);
   }
 }

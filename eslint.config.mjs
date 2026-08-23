@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Edge Functions rodam em Deno, com os tipos e as diretivas do Deno. Este
+    // config e o do Next: ele nao entende `// deno-lint-ignore` nem os imports
+    // por URL, e so produziria erro em codigo que nao vai para o bundle.
+    "supabase/functions/**",
   ]),
 ]);
 

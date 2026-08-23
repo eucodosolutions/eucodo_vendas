@@ -28,7 +28,7 @@ export type ArtInput = {
   reviewUrl: string;
 };
 
-/** Tamanhos que ja saem cadastrados. Servem de semente da tabela de tamanhos. */
+/** Formatos que ja saem cadastrados. Servem de semente do catalogo da conta. */
 export const DEFAULT_SPECS: Record<string, ArtSpec> = {
   A6: {
     code: "A6",

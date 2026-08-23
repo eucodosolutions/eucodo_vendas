@@ -1,7 +1,14 @@
 "use client";
 
 import { Eye, EyeOff } from "lucide-react";
-import { useId, useState, type InputHTMLAttributes, type ReactNode } from "react";
+import {
+  useId,
+  useState,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type Ref,
+  type TextareaHTMLAttributes,
+} from "react";
 
 import {
   ALTURA_CONTROLE,
@@ -17,6 +24,8 @@ type CampoProps = Omit<InputHTMLAttributes<HTMLInputElement>, "className"> & {
   placeholder: string;
   ajuda?: ReactNode;
   erro?: string;
+  /** Para quem precisa devolver o foco ao campo, como o carrinho da venda. */
+  ref?: Ref<HTMLInputElement>;
 };
 
 /**
@@ -27,7 +36,7 @@ type CampoProps = Omit<InputHTMLAttributes<HTMLInputElement>, "className"> & {
  * todo campo pede placeholder. Senha digitada as cegas no celular, no meio de
  * uma venda, e erro de digitacao garantido.
  */
-export function Campo({ rotulo, ajuda, erro, id, type = "text", ...props }: CampoProps) {
+export function Campo({ rotulo, ajuda, erro, id, ref, type = "text", ...props }: CampoProps) {
   const gerado = useId();
   const campoId = id ?? props.name ?? gerado;
   const ajudaId = ajuda ? `${campoId}-ajuda` : undefined;
@@ -45,6 +54,7 @@ export function Campo({ rotulo, ajuda, erro, id, type = "text", ...props }: Camp
       <div className="relative">
         <input
           {...props}
+          ref={ref}
           id={campoId}
           type={ehSenha && revelada ? "text" : type}
           aria-invalid={erro ? true : undefined}
@@ -70,6 +80,58 @@ export function Campo({ rotulo, ajuda, erro, id, type = "text", ...props }: Camp
           </button>
         ) : null}
       </div>
+
+      {ajuda ? (
+        <p id={ajudaId} className="text-xs text-tinta-suave">
+          {ajuda}
+        </p>
+      ) : null}
+      {erro ? (
+        <p id={erroId} className="text-xs font-medium text-erro">
+          {erro}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+type CampoTextoProps = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "className"> & {
+  rotulo: string;
+  placeholder: string;
+  ajuda?: ReactNode;
+  erro?: string;
+};
+
+/**
+ * Campo de varias linhas, com a mesma moldura do `Campo`.
+ *
+ * Existe por causa da descricao do produto, que e o texto que o cliente le para
+ * entender o que esta comprando: cabe mal numa linha so.
+ */
+export function CampoTexto({ rotulo, ajuda, erro, id, rows = 3, ...props }: CampoTextoProps) {
+  const gerado = useId();
+  const campoId = id ?? props.name ?? gerado;
+  const ajudaId = ajuda ? `${campoId}-ajuda` : undefined;
+  const erroId = erro ? `${campoId}-erro` : undefined;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={campoId} className="text-rotulo font-medium text-tinta">
+        {rotulo}
+      </label>
+
+      <textarea
+        {...props}
+        id={campoId}
+        rows={rows}
+        aria-invalid={erro ? true : undefined}
+        aria-describedby={[ajudaId, erroId].filter(Boolean).join(" ") || undefined}
+        className={juntar(
+          MOLDURA_CONTROLE,
+          erro ? BORDA_ERRO : BORDA_NORMAL,
+          "resize-y px-3 py-2 placeholder:text-tinta-suave/70",
+        )}
+      />
 
       {ajuda ? (
         <p id={ajudaId} className="text-xs text-tinta-suave">
