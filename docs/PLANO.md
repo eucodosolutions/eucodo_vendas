@@ -84,7 +84,7 @@ Tudo em portugues, e quase tudo com dono (`assinatura_id`):
 - `produtos`: o catalogo da conta (tipo, codigo, nome, descricao, foto, preco,
   comissao, prazo)
 - `produto_avaliacao`: so o que a placa tem (medidas, cores e tecnologias oferecidas)
-- `clientes`: nome e WhatsApp obrigatorios, unico por conta
+- `clientes`: nome e WhatsApp obrigatorios, unico por autor dentro da conta
 - `pedidos`: cliente, total, status, pagamento, comissao, prazo, origem
 - `pedido_itens`: produto e retrato dele no dia da venda, comissao da linha,
   quantidade e, so na placa, negocio impresso, link de avaliacao e arquivos da arte
@@ -109,8 +109,8 @@ Tres papeis, e dois paineis:
   assinatura em `/admin/assinantes` — nao existe um segundo estado no perfil para liberar
   junto, justamente porque um deles sempre ficava para tras.
 - **Vendedor** e criado pelo assinante em `/equipe`, ja preso a assinatura dele. Ve so os
-  pedidos que abriu e os clientes que cadastrou, nao edita cliente e nao entra em Produtos
-  nem em Ajustes.
+  pedidos que abriu e os clientes que cadastrou, e nao entra em Produtos nem em Ajustes.
+  Os clientes dele sao dele: cadastra, edita e remove.
   A senha vem gerada pela Edge Function `equipe`, aparece uma vez para o dono copiar e
   mandar no WhatsApp, e a troca e obrigatoria no primeiro acesso.
 
@@ -131,8 +131,15 @@ e a policy do bucket compara a primeira pasta com `minha_assinatura()`.
 
 ## Clientes
 
-Cadastro proprio, com nome e WhatsApp obrigatorios, unico por `(assinatura_id, whatsapp)`.
-O vendedor cadastra e enxerga os dele; editar e remover e do dono da conta.
+Cadastro proprio, com nome e WhatsApp obrigatorios, unico por
+`(assinatura_id, whatsapp, criado_por)`. Sao duas agendas debaixo da mesma conta: o vendedor
+cadastra, edita, remove e enxerga so os dele; o dono da conta ve todos e mexe em todos, com
+etiqueta de autor no que veio da equipe.
+
+A unicidade e por autor porque o vendedor nao ve os clientes do assinante: fosse por conta, o
+numero que o dono ja tem cadastrado barraria o cadastro do vendedor sem lhe dar nenhuma saida
+— ele nao veria o cliente para escolher, e nao conseguiria criar. Repetido para a mesma
+pessoa continua barrado, que e o caso que de fato parte o historico de compra em dois.
 
 ## Carrinho
 
@@ -144,6 +151,12 @@ e agora tambem uma placa e uma camiseta na mesma venda.
 O carrinho vive no `localStorage`, nao no banco: ele dura dois minutos no meio de uma
 conversa de venda. O total e a comissao sao conta do gatilho `recalcular_pedido`, nunca da
 aplicacao.
+
+Ele se abre de dois lugares, e nenhum deles cobre a vitrine: no computador, um botao no
+cabecalho da tela de venda, que fica preso no topo enquanto a grade rola; no celular, o botao
+redondo levantado no meio da barra de baixo, que so aparece com item dentro. Por isso o
+estado da gaveta mora num store de modulo (`src/lib/carrinho/gaveta.ts`): quem abre no
+celular e a navegacao, que vive fora da tela de venda.
 
 ## Comissao
 
@@ -197,6 +210,7 @@ Tudo salvo no Supabase Storage, em bucket privado com URL assinada.
 12. [feito] Produto por tipo: placa de avaliacao e padrao, comissao e prazo no produto
 13. [feito] Acesso so pela assinatura, Produtos em aba propria e cadastro em popup
 14. [feito] WhatsApp em Ajustes: o assinante conecta por QR code, e a instancia e da conta
+15. [feito] Cliente do vendedor: cadastro por autor, edicao e remocao de quem cadastrou
 
 Passo a passo para subir o ambiente: `docs/CONFIGURACAO.md`.
 

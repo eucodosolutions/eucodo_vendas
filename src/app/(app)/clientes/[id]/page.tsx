@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DadosDoCliente } from "./dados-do-cliente";
-import { EtiquetaPagamento, EtiquetaStatus } from "@/components/etiquetas";
+import { EtiquetaDeAutor, EtiquetaPagamento, EtiquetaStatus } from "@/components/etiquetas";
 import { LinkBotao } from "@/components/ui/link-botao";
 import { Secao } from "@/components/ui/secao";
 import { dataHora, moeda, whatsappLegivel } from "@/lib/formato";
@@ -12,6 +12,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { Cliente, Pedido } from "@/types/database";
 
 export const metadata: Metadata = { title: "Cliente" };
+
+type ClienteComAutor = Cliente & { autor: { nome: string } | null };
 
 type LinhaPedido = Pick<
   Pedido,
@@ -26,9 +28,9 @@ export default async function PaginaCliente({ params }: PageProps<"/clientes/[id
 
   const { data: cliente } = await supabase
     .from("clientes")
-    .select("*")
+    .select("*, autor:perfis (nome)")
     .eq("id", id)
-    .single<Cliente>();
+    .single<ClienteComAutor>();
 
   if (!cliente) notFound();
 
@@ -40,7 +42,11 @@ export default async function PaginaCliente({ params }: PageProps<"/clientes/[id
     .limit(50)
     .returns<LinhaPedido[]>();
 
-  const podeEditar = sessao?.perfil.papel === "assinante";
+  // Quem cadastrou manda no cadastro, e o dono da conta manda em todos. E a
+  // mesma regra da policy: repetida aqui so para a tela nao oferecer um botao
+  // que o banco vai recusar.
+  const daPessoa = Boolean(sessao && cliente.criado_por === sessao.perfil.id);
+  const podeEditar = sessao?.perfil.papel === "assinante" || daPessoa;
   const compras = pedidos ?? [];
   const gasto = compras
     .filter((pedido) => pedido.status !== "cancelado")
@@ -54,9 +60,14 @@ export default async function PaginaCliente({ params }: PageProps<"/clientes/[id
 
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="truncate text-2xl font-semibold tracking-tight text-tinta">
-            {cliente.nome}
-          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="truncate text-2xl font-semibold tracking-tight text-tinta">
+              {cliente.nome}
+            </h1>
+            {cliente.criado_por && !daPessoa ? (
+              <EtiquetaDeAutor nome={cliente.autor?.nome ?? "alguém da equipe"} />
+            ) : null}
+          </div>
           <p className="mt-1 text-sm text-tinta-suave tabular-nums">
             {whatsappLegivel(cliente.whatsapp)}
           </p>

@@ -1,9 +1,9 @@
 "use client";
 
-import { ShoppingCart } from "lucide-react";
-import { useState, useActionState } from "react";
+import { useEffect, useState, useActionState } from "react";
 
 import { criarPedido, type EstadoVenda, type PedidoDoCarrinho } from "./actions";
+import { BotaoDoCarrinho } from "./botao-do-carrinho";
 import { CartaoDeProduto } from "./cartao-de-produto";
 import type { ClienteDaLista } from "./escolher-cliente";
 import { GavetaDoCarrinho } from "./gaveta-do-carrinho";
@@ -11,9 +11,8 @@ import { ModalFechamento } from "./modal-fechamento";
 import { ModalItem } from "./modal-item";
 import { avisar, useAviso } from "@/components/ui/avisos";
 import type { PreviaDaArte } from "@/lib/art/vitrine";
+import { fecharCarrinho, useCarrinhoAberto } from "@/lib/carrinho/gaveta";
 import { useCarrinho } from "@/lib/carrinho/usar-carrinho";
-import { pecasDoCarrinho, totalDoCarrinho } from "@/lib/carrinho/carrinho";
-import { moeda } from "@/lib/formato";
 import type { CorArte, TecnologiaArte, TipoProduto } from "@/types/database";
 
 export type ProdutoDaVenda = {
@@ -65,11 +64,14 @@ export function VendaRapida({
     produto: ProdutoDaVenda;
     cor: CorArte | null;
   } | null>(null);
-  const [gavetaAberta, setGavetaAberta] = useState(false);
   const [fechamentoAberto, setFechamentoAberto] = useState(false);
 
-  const pecas = pecasDoCarrinho(carrinho.itens);
-  const temItens = pecas > 0;
+  // A gaveta e aberta de dois lugares: o botao do cabecalho, no computador, e o
+  // botao redondo da barra de baixo, no celular, que vive fora desta tela. Por
+  // isso o estado dela mora num store, e nao aqui. A limpeza na saida evita
+  // reencontrar a gaveta aberta na proxima visita a tela de venda.
+  const gavetaAberta = useCarrinhoAberto();
+  useEffect(() => fecharCarrinho, []);
 
   function adicionar(item: Parameters<typeof carrinho.adicionar>[0]) {
     carrinho.adicionar(item);
@@ -78,13 +80,18 @@ export function VendaRapida({
 
   return (
     <div className="flex flex-col gap-5">
-      <header className="flex flex-wrap items-start justify-between gap-3">
+      {/* Preso no topo no computador: a vitrine rola, o carrinho fica. O fundo
+          e o da pagina, e as margens negativas cobrem o respiro lateral do
+          painel, senao os cartoes apareceriam passando pelas beiradas. */}
+      <header className="flex flex-wrap items-center justify-between gap-3 md:sticky md:top-0 md:z-20 md:-mx-5 md:-mt-2 md:bg-papel md:px-5 md:py-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-tinta">Vender</h1>
           <p className="mt-1 text-sm text-tinta-suave">
             Escolha o produto, complete o item e feche o pedido.
           </p>
         </div>
+
+        <BotaoDoCarrinho />
       </header>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -97,30 +104,6 @@ export function VendaRapida({
         ))}
       </div>
 
-      {/* Barra do carrinho presa no rodape, e nao um botao redondo solto: ela
-          mostra o total, que e o que o vendedor confere antes de fechar. Some
-          quando o carrinho esta vazio para nao cobrir a vitrine a toa. */}
-      {temItens ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center p-4 pb-24 md:pb-4">
-          <button
-            type="button"
-            onClick={() => setGavetaAberta(true)}
-            className="pointer-events-auto flex items-center gap-3 rounded-full bg-marca py-3 pr-4 pl-5 text-white shadow-lg transition-colors hover:bg-marca-escura"
-          >
-            <ShoppingCart size={18} aria-hidden />
-            <span className="text-sm font-medium">
-              {pecas} {pecas === 1 ? "peça" : "peças"}
-            </span>
-            <span className="text-sm font-semibold tabular-nums">
-              {moeda(totalDoCarrinho(carrinho.itens))}
-            </span>
-            <span className="rounded-full bg-white/20 px-3 py-1 text-sm font-medium">
-              Ver carrinho
-            </span>
-          </button>
-        </div>
-      ) : null}
-
       <ModalItem
         produto={itemAberto?.produto ?? null}
         cor={itemAberto?.cor ?? null}
@@ -130,7 +113,7 @@ export function VendaRapida({
 
       <GavetaDoCarrinho
         aberta={gavetaAberta}
-        aoFechar={() => setGavetaAberta(false)}
+        aoFechar={fecharCarrinho}
         itens={carrinho.itens}
         aoRemover={carrinho.remover}
         aoMudarQuantidade={carrinho.mudarQuantidade}

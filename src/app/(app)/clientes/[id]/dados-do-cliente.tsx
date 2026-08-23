@@ -19,6 +19,9 @@ import { whatsappLegivel } from "@/lib/formato";
  * versao so de leitura, escrita a parte: dois desenhos do mesmo bloco, que
  * envelheciam separados. Agora todo mundo ve o mesmo, e quem pode editar ganha
  * o botao que abre o popup.
+ *
+ * `podeEditar` vem de fora porque a regra e do banco: mexe no cliente quem
+ * cadastrou, mais o dono da conta.
  */
 export function DadosDoCliente({
   cliente,
@@ -84,10 +87,11 @@ export function DadosDoCliente({
         </dl>
 
         {podeEditar ? null : (
-          // A policy de update e do dono da conta: sem o aviso, o vendedor fica
-          // procurando um botao de editar que nunca vai existir para ele.
+          // Sem o aviso, quem abriu o cadastro fica procurando um botao de
+          // editar que nao existe para ele.
           <p className="mt-4 text-xs text-tinta-suave">
-            Alterar ou remover cliente é com o dono da conta.
+            Este cliente foi cadastrado por outra pessoa da equipe. Alterar ou remover é com quem
+            cadastrou, ou com o dono da conta.
           </p>
         )}
       </Secao>
