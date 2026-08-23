@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { salvarCliente, type EstadoCliente } from "./actions";
+import { BuscaDeNegocio, type NegocioEscolhido } from "@/components/ui/busca-de-negocio";
 import { Campo } from "@/components/ui/campo";
 import { CampoWhatsapp } from "@/components/ui/campo-whatsapp";
 import { ModalDeFormulario } from "@/components/ui/modal-de-formulario";
@@ -11,7 +12,7 @@ import type { Cliente } from "@/types/database";
 
 export type ClienteEditavel = Pick<
   Cliente,
-  "id" | "nome" | "whatsapp" | "link_avaliacao" | "observacoes"
+  "id" | "nome" | "whatsapp" | "google_place_id" | "link_avaliacao" | "observacoes"
 >;
 
 /** O minimo que quem chamou precisa para seguir com o cliente recem-gravado. */
@@ -39,6 +40,18 @@ export function ModalCliente({
    */
   aoSalvar?: (gravado: ClienteGravado) => void;
 }) {
+  // Cliente ja cadastrado com link volta como negocio resolvido: o popup abre
+  // mostrando o que esta gravado, e nao uma busca vazia que parece perda.
+  const [negocio, setNegocio] = useState<NegocioEscolhido | null>(
+    cliente?.link_avaliacao
+      ? {
+          nome: cliente.nome,
+          linkAvaliacao: cliente.link_avaliacao,
+          placeId: cliente.google_place_id ?? undefined,
+        }
+      : null,
+  );
+
   const [estado, acao, pendente] = useActionState<EstadoCliente, FormData>(
     async (anterior, dados) => {
       const resposta = await salvarCliente(anterior, dados);
@@ -82,14 +95,11 @@ export function ModalCliente({
         <CampoWhatsapp required valorInicial={cliente?.whatsapp ?? ""} autoComplete="off" />
       </div>
 
-      <Campo
-        rotulo="Link de avaliação do Google"
-        name="linkAvaliacao"
-        placeholder="https://g.page/r/.../review"
-        inputMode="url"
-        defaultValue={cliente?.link_avaliacao ?? ""}
-        ajuda="Opcional. Quando preenchido, já vem pronto na próxima venda para este cliente."
-      />
+      {/* O link nao e digitado: ele viaja escondido, do jeito que o Google
+          devolveu. Opcional aqui — serve para ja vir pronto na proxima venda. */}
+      <input type="hidden" name="linkAvaliacao" value={negocio?.linkAvaliacao ?? ""} />
+      <input type="hidden" name="placeId" value={negocio?.placeId ?? ""} />
+      <BuscaDeNegocio escolhido={negocio} aoEscolher={setNegocio} />
 
       <Campo
         rotulo="Observações"

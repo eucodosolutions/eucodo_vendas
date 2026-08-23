@@ -19,6 +19,8 @@ const esquema = z.object({
   nome: z.string().trim().min(2, "Digite o nome do cliente."),
   whatsapp: z.string().trim().min(1, "Digite o WhatsApp do cliente."),
   linkAvaliacao: z.string().trim().optional(),
+  /** Vem junto quando o negocio foi achado na busca; colado a mao nao tem. */
+  placeId: z.string().trim().optional(),
   observacoes: z.string().trim().max(500).optional(),
 });
 
@@ -40,6 +42,7 @@ export async function salvarCliente(
     nome: dados.get("nome"),
     whatsapp: dados.get("whatsapp"),
     linkAvaliacao: dados.get("linkAvaliacao") || undefined,
+    placeId: dados.get("placeId") || undefined,
     observacoes: dados.get("observacoes") || undefined,
   });
 
@@ -72,7 +75,7 @@ async function gravar(dados: DadosDoCliente): Promise<EstadoCliente> {
   if (dados.linkAvaliacao) {
     link = validarLinkAvaliacao(dados.linkAvaliacao);
     if (!link) {
-      return { erro: "Esse link não parece do Google. Use o link de avaliação do perfil." };
+      return { erro: "Esse link não abre a caixa de avaliação. Busque o negócio no Google." };
     }
   }
 
@@ -85,6 +88,9 @@ async function gravar(dados: DadosDoCliente): Promise<EstadoCliente> {
     nome: dados.nome,
     whatsapp,
     link_avaliacao: link,
+    // Sem link nao existe place id: os dois nascem da mesma escolha, e guardar
+    // um id orfao so daria a ilusao de que o negocio esta resolvido.
+    google_place_id: link ? dados.placeId || null : null,
     observacoes: dados.observacoes || null,
   };
 

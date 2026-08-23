@@ -72,19 +72,21 @@ export function whatsappLegivel(normalizado: string): string {
   return `(${ddd}) ${resto.slice(0, 4)}-${resto.slice(4)}`;
 }
 
-const DOMINIOS_DE_AVALIACAO = [
-  "g.page",
-  "search.google.com",
-  "maps.app.goo.gl",
-  "goo.gl",
-  "google.com",
-  "maps.google.com",
-];
-
 /**
- * O link de avaliacao chega de varios jeitos: o curto do g.page, o encurtado do
- * app de mapas, ou o writereview completo. Aceitamos todos e recusamos o resto,
- * porque link errado vira QR errado impresso em acrilico.
+ * Confere se o link abre mesmo a caixa de avaliacao.
+ *
+ * Conferir o dominio nao basta, e essa foi a licao cara: `maps.app.goo.gl` e
+ * `google.com/maps/place/...` sao links legitimos do Google, abrem sem erro
+ * nenhum, e levam para a ficha do negocio — onde ninguem avalia. O QR sai
+ * impresso em acrilico e o defeito so aparece na mao do cliente.
+ *
+ * So dois formatos abrem o formulario:
+ *
+ * - `g.page/r/<codigo>/review`, o que o Google mostra em "Peça avaliações"
+ *   dentro do painel do Perfil da Empresa;
+ * - `search.google.com/local/writereview?placeid=<id>`, o que se monta a partir
+ *   do id do lugar — e o que a Places API devolve para quem nao gerencia o
+ *   perfil.
  */
 export function validarLinkAvaliacao(bruto: string): string | null {
   const texto = bruto.trim();
@@ -92,16 +94,26 @@ export function validarLinkAvaliacao(bruto: string): string | null {
 
   const comProtocolo = /^https?:\/\//i.test(texto) ? texto : `https://${texto}`;
 
+  let url: URL;
   try {
-    const url = new URL(comProtocolo);
-    const host = url.hostname.replace(/^www\./, "");
-    const valido = DOMINIOS_DE_AVALIACAO.some(
-      (dominio) => host === dominio || host.endsWith(`.${dominio}`),
-    );
-    return valido ? url.toString() : null;
+    url = new URL(comProtocolo);
   } catch {
     return null;
   }
+
+  const host = url.hostname.replace(/^www\./, "").toLowerCase();
+
+  // O caminho termina em /review tanto no formato novo (/r/<codigo>/review)
+  // quanto no antigo, de nome escolhido (/<apelido>/review).
+  if (host === "g.page") {
+    return /\/review\/?$/i.test(url.pathname) ? url.toString() : null;
+  }
+
+  if (host === "search.google.com" && /^\/local\/writereview\/?$/i.test(url.pathname)) {
+    return url.searchParams.get("placeid") ? url.toString() : null;
+  }
+
+  return null;
 }
 
 /**
