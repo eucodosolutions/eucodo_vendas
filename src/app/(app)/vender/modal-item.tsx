@@ -6,6 +6,7 @@ import { Quantidade } from "./quantidade";
 import type { ProdutoDaVenda } from "./venda-rapida";
 import { avisar } from "@/components/ui/avisos";
 import { Botao } from "@/components/ui/botao";
+import { BuscaDeNegocio, type NegocioEscolhido } from "@/components/ui/busca-de-negocio";
 import { Campo } from "@/components/ui/campo";
 import { Escolha } from "@/components/ui/escolha";
 import { Modal } from "@/components/ui/modal";
@@ -65,21 +66,30 @@ function Formulario({
 
   const [cor, setCor] = useState<CorArte | null>(corInicial ?? placa?.cores[0] ?? null);
   const [quantidade, setQuantidade] = useState(1);
+  const [negocio, setNegocio] = useState<NegocioEscolhido | null>(null);
   const [nomeNegocio, setNomeNegocio] = useState("");
-  const [linkAvaliacao, setLinkAvaliacao] = useState("");
 
   const campoDoNegocio = useRef<HTMLInputElement>(null);
 
+  function escolherNegocio(escolhido: NegocioEscolhido | null) {
+    setNegocio(escolhido);
+    // O nome que veio do Google entra como sugestao e continua editavel: e ele
+    // que vai impresso, e "Barbearia Vintage LTDA" nao e o que o dono quer ver
+    // no acrilico. Trocar de negocio limpa o campo, senao o nome do anterior
+    // ficaria colado no link do novo.
+    setNomeNegocio(escolhido?.nome ?? "");
+  }
+
   function confirmar() {
     if (placa) {
-      if (nomeNegocio.trim().length < 2) {
-        avisar.atencao("Digite o nome do negócio que vai impresso nesta placa.");
-        campoDoNegocio.current?.focus();
+      if (!negocio) {
+        avisar.atencao("Encontre o negócio no Google para o QR abrir a avaliação.");
         return;
       }
 
-      if (!linkAvaliacao.trim()) {
-        avisar.atencao("Cole o link de avaliação do Google deste negócio.");
+      if (nomeNegocio.trim().length < 2) {
+        avisar.atencao("Digite o nome do negócio que vai impresso nesta placa.");
+        campoDoNegocio.current?.focus();
         return;
       }
     }
@@ -92,7 +102,8 @@ function Formulario({
       quantidade,
       cor: cor ?? undefined,
       nomeNegocio: placa ? nomeNegocio.trim() : undefined,
-      linkAvaliacao: placa ? linkAvaliacao.trim() : undefined,
+      linkAvaliacao: placa ? negocio!.linkAvaliacao : undefined,
+      placeId: placa ? negocio!.placeId : undefined,
     });
 
     aoFechar();
@@ -122,26 +133,22 @@ function Formulario({
       <div className="flex flex-col gap-5">
         {placa ? (
           <>
-            <Campo
-              ref={campoDoNegocio}
-              rotulo="Nome do negócio"
-              name="nomeNegocio"
-              placeholder="Barbearia Vintage"
-              autoComplete="off"
-              value={nomeNegocio}
-              onChange={(evento) => setNomeNegocio(evento.target.value)}
-              ajuda="É este nome que vai impresso no display, no lugar do logo do Google."
-            />
+            {/* A busca vem antes do nome de proposito: achado o negocio, o
+                nome ja chega preenchido e o vendedor so ajusta se quiser. */}
+            <BuscaDeNegocio escolhido={negocio} aoEscolher={escolherNegocio} />
 
-            <Campo
-              rotulo="Link de avaliação do Google"
-              name="linkAvaliacao"
-              placeholder="https://g.page/r/.../review"
-              inputMode="url"
-              value={linkAvaliacao}
-              onChange={(evento) => setLinkAvaliacao(evento.target.value)}
-              ajuda="Aceita o link do g.page, o encurtado do Maps ou o endereço completo."
-            />
+            {negocio ? (
+              <Campo
+                ref={campoDoNegocio}
+                rotulo="Nome do negócio"
+                name="nomeNegocio"
+                placeholder="Barbearia Vintage"
+                autoComplete="off"
+                value={nomeNegocio}
+                onChange={(evento) => setNomeNegocio(evento.target.value)}
+                ajuda="É este nome que vai impresso no display, no lugar do logo do Google."
+              />
+            ) : null}
 
             {/* A tecnologia nao e escolha aqui: ela e o proprio produto, e cada
                 uma tem o seu preco. O que muda dentro do produto e so a cor. */}

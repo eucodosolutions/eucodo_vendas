@@ -62,6 +62,18 @@ por instancia, e a tabela `instancias_whatsapp` guarda so o id do segredo.
   `service_role`. E a unica porta de saida do token, e ela so abre de dentro da
   Edge Function.
 
+A chave do Google e o outro caso, e o oposto do da uazapi: ela e a mesma para a
+plataforma inteira, nao muda por assinante, entao e segredo de funcao mesmo.
+
+```
+npx supabase secrets set GOOGLE_PLACES_API_KEY=... --project-ref SEUREF
+```
+
+E uma chave de **Places API (New)**, restrita a essa API so, com teto diario de
+requisicoes no console do Google. Sem restricao por IP nem por referrer, porque
+a funcao sai de IP dinamico e a chamada nao parte do navegador: o que protege e
+a chave nunca sair daqui.
+
 Se um dia surgir outro token de terceiro que seja mesmo global, ai sim vale
 `npx supabase secrets set CHAVE=valor --project-ref SEUREF`.
 
