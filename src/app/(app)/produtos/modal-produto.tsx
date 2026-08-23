@@ -11,14 +11,23 @@ import { Campo, CampoTexto } from "@/components/ui/campo";
 import { Confirmacao } from "@/components/ui/confirmacao";
 import { Escolha } from "@/components/ui/escolha";
 import { ModalDeFormulario } from "@/components/ui/modal-de-formulario";
-import { CORES, DETALHE_DO_TIPO, TECNOLOGIAS, TIPOS } from "@/lib/catalogo";
+import { Selecao } from "@/components/ui/selecao";
+import {
+  ACABAMENTO_PADRAO,
+  CORES,
+  DETALHE_DO_TIPO,
+  TAMANHOS,
+  TECNOLOGIAS,
+  TIPOS,
+  tamanhoDasMedidas,
+  type TamanhoDePlaca,
+} from "@/lib/catalogo";
 import { ROTULO_COR, ROTULO_TECNOLOGIA, ROTULO_TIPO_PRODUTO } from "@/lib/formato";
 import type { CorArte, TecnologiaArte, TipoProduto } from "@/types/database";
 
 export type ProdutoEditavel = {
   id: string;
   tipo: TipoProduto;
-  codigo: string;
   nome: string;
   descricao: string | null;
   foto_url: string | null;
@@ -33,19 +42,34 @@ export type ProdutoEditavel = {
     sangria_mm: number;
     dpi: number;
     cores: CorArte[];
-    tecnologias: TecnologiaArte[];
+    tecnologia: TecnologiaArte;
   } | null;
 };
 
 /** Prazo sugerido para produto novo. O prazo que vale e sempre o do produto. */
 const PRAZO_SUGERIDO = 3;
 
+const OPCOES_DE_TAMANHO = [
+  ...(Object.keys(TAMANHOS) as Array<keyof typeof TAMANHOS>).map((chave) => ({
+    valor: chave,
+    texto: `${TAMANHOS[chave].rotulo} — ${TAMANHOS[chave].largura_mm} x ${TAMANHOS[chave].altura_mm} mm`,
+  })),
+  { valor: "personalizado", texto: "Personalizado" },
+];
+
 /**
- * Cadastro de produto em popup, com os campos que o tipo pede e mais nenhum.
+ * Cadastro de produto em popup, na ordem em que a decisao acontece.
+ *
+ * Tipo, nome, o que a placa e (tamanho, medidas, cores, tecnologia) e so entao
+ * quanto custa. A tela antiga misturava as tres coisas numa grade so, e o preco
+ * aparecia antes de o produto estar definido.
  *
  * O tipo so e escolhido na criacao. Trocar o tipo de um produto ja vendido nao
  * tem resposta boa: os itens antigos guardam o retrato do que foi vendido, e o
  * produto passaria a contradizer o proprio historico.
+ *
+ * "Ativo na venda" nao mora aqui: produto nasce ativo e quem liga e desliga e o
+ * interruptor da lista.
  */
 export function ModalProduto({
   aberto,
@@ -62,12 +86,16 @@ export function ModalProduto({
     {},
   );
 
+  const medidas = produto?.produto_avaliacao;
+
   const [tipo, setTipo] = useState<TipoProduto>(produto?.tipo ?? "avaliacao");
+  const [tamanho, setTamanho] = useState<TamanhoDePlaca>(
+    medidas ? tamanhoDasMedidas(medidas.largura_mm, medidas.altura_mm) : "a6",
+  );
   const [foto, setFoto] = useState<string | null>(produto?.foto_url ?? null);
   const [confirmandoRemocao, setConfirmandoRemocao] = useState(false);
 
   const avaliacao = tipo === "avaliacao";
-  const medidas = produto?.produto_avaliacao;
 
   // Removido o produto, nao ha mais o que editar atras da confirmacao.
   useAoDarCerto(estadoRemocao, aoFechar);
@@ -121,144 +149,74 @@ export function ModalProduto({
           />
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Campo
-            rotulo="Código"
-            name="codigo"
-            placeholder="A5"
-            defaultValue={produto?.codigo}
-            required
-            ajuda="Curto, aparece no pedido."
-          />
-          <Campo
-            rotulo="Nome"
-            name="nome"
-            placeholder="Display A5"
-            defaultValue={produto?.nome}
-            required
-          />
-          <Campo
-            rotulo="Valor"
-            name="preco"
-            inputMode="decimal"
-            placeholder="79,00"
-            defaultValue={produto ? reais(produto.preco_centavos) : ""}
-            required
-          />
-          <Campo
-            rotulo="Comissão (%)"
-            name="comissao"
-            inputMode="decimal"
-            placeholder="10"
-            defaultValue={produto ? numero(produto.comissao_percentual) : "0"}
-            required
-            ajuda="Quanto o vendedor ganha por venda."
-          />
-          <Campo
-            rotulo="Prazo de entrega (dias)"
-            name="prazo"
-            type="number"
-            min={0}
-            max={365}
-            placeholder="3"
-            defaultValue={produto?.prazo_entrega_dias ?? PRAZO_SUGERIDO}
-            required
-            ajuda="O pedido sai quando o item mais lento fica pronto."
-          />
-          <label className="flex items-center gap-2 self-end pb-2.5 text-sm font-medium text-tinta">
-            <input
-              type="checkbox"
-              name="ativo"
-              defaultChecked={produto?.ativo ?? true}
-              className="size-4 accent-marca"
-            />
-            Ativo na venda
-          </label>
-        </div>
-
-        <CampoTexto
-          rotulo="Descrição"
-          name="descricao"
-          placeholder="Camiseta em algodão, tamanhos P ao GG."
-          defaultValue={produto?.descricao ?? ""}
-          required={!avaliacao}
+        <Campo
+          rotulo="Nome"
+          name="nome"
+          placeholder={avaliacao ? "Display A5 QR" : "Camiseta bordada"}
+          defaultValue={produto?.nome}
+          required
           ajuda={
             avaliacao
-              ? "Opcional. A arte já mostra ao cliente o que ele leva."
-              : "É o que o cliente lê para entender o que está comprando."
+              ? "É o nome que o vendedor escolhe na venda. Diga o tamanho e a tecnologia."
+              : "É o nome que o vendedor escolhe na venda."
           }
         />
 
         {avaliacao ? (
-          <fieldset className="border-t border-borda pt-4">
-            <legend className="mb-3 text-xs font-semibold tracking-wide text-tinta-suave uppercase">
-              Medidas da placa
-            </legend>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Campo
-                rotulo="Largura (mm)"
-                name="largura"
-                inputMode="decimal"
-                placeholder="150"
-                defaultValue={medidas ? numero(medidas.largura_mm) : ""}
-                required
-              />
-              <Campo
-                rotulo="Altura (mm)"
-                name="altura"
-                inputMode="decimal"
-                placeholder="212"
-                defaultValue={medidas ? numero(medidas.altura_mm) : ""}
-                required
-              />
-              <Campo
-                rotulo="Margem de segurança (mm)"
-                name="margem"
-                inputMode="decimal"
-                placeholder="7"
-                defaultValue={medidas ? numero(medidas.margem_seguranca_mm) : "7"}
-                required
-                ajuda="Área que a arte não invade."
-              />
-              <Campo
-                rotulo="Sangria (mm)"
-                name="sangria"
-                inputMode="decimal"
-                placeholder="0"
-                defaultValue={medidas ? numero(medidas.sangria_mm) : "0"}
-                required
-                ajuda="O que a gráfica apara."
-              />
-              <Campo
-                rotulo="DPI"
-                name="dpi"
-                type="number"
-                min={72}
-                max={1200}
-                placeholder="300"
-                defaultValue={medidas?.dpi ?? 300}
-                required
-              />
-            </div>
-
-            <div className="mt-5 grid gap-5 sm:grid-cols-2">
-              <Marcadores
-                titulo="Cores oferecidas"
-                nome="cores"
-                opcoes={CORES.map((valor) => ({ valor, rotulo: ROTULO_COR[valor] }))}
-                marcados={medidas?.cores ?? CORES}
-              />
-              <Marcadores
-                titulo="Tecnologias oferecidas"
-                nome="tecnologias"
-                opcoes={TECNOLOGIAS.map((valor) => ({ valor, rotulo: ROTULO_TECNOLOGIA[valor] }))}
-                marcados={medidas?.tecnologias ?? TECNOLOGIAS}
-              />
-            </div>
-          </fieldset>
+          <PlacaDeAvaliacao
+            tamanho={tamanho}
+            aoTrocarTamanho={setTamanho}
+            medidas={medidas ?? null}
+          />
         ) : (
-          <FotoDoProduto foto={foto} aoTrocar={setFoto} fotoAtual={produto?.foto_url ?? null} />
+          <>
+            <CampoTexto
+              rotulo="Descrição"
+              name="descricao"
+              placeholder="Camiseta em algodão, tamanhos P ao GG."
+              defaultValue={produto?.descricao ?? ""}
+              required
+              ajuda="É o que o cliente lê para entender o que está comprando."
+            />
+            <FotoDoProduto foto={foto} aoTrocar={setFoto} fotoAtual={produto?.foto_url ?? null} />
+          </>
         )}
+
+        <fieldset className="border-t border-borda pt-4">
+          <legend className="mb-3 text-xs font-semibold tracking-wide text-tinta-suave uppercase">
+            Venda
+          </legend>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Campo
+              rotulo="Valor"
+              name="preco"
+              inputMode="decimal"
+              placeholder="79,00"
+              defaultValue={produto ? reais(produto.preco_centavos) : ""}
+              required
+            />
+            <Campo
+              rotulo="Comissão (%)"
+              name="comissao"
+              inputMode="decimal"
+              placeholder="10"
+              defaultValue={produto ? numero(produto.comissao_percentual) : "0"}
+              required
+              ajuda="Quanto o vendedor ganha por venda."
+            />
+            <Campo
+              rotulo="Prazo de entrega (dias)"
+              name="prazo"
+              type="number"
+              min={0}
+              max={365}
+              placeholder="3"
+              defaultValue={produto?.prazo_entrega_dias ?? PRAZO_SUGERIDO}
+              required
+              ajuda="O pedido sai quando o item mais lento fica pronto."
+            />
+          </div>
+        </fieldset>
       </ModalDeFormulario>
 
       {produto ? (
@@ -266,7 +224,7 @@ export function ModalProduto({
           aberto={confirmandoRemocao}
           aoFechar={() => setConfirmandoRemocao(false)}
           titulo={`Remover ${produto.nome}?`}
-          mensagem="O produto sai do catálogo para sempre. Se ele já foi vendido, o sistema não deixa apagar: desmarque “Ativo na venda” para tirá-lo da tela de venda sem perder o histórico."
+          mensagem="O produto sai do catálogo para sempre. Se ele já foi vendido, o sistema não deixa apagar: desligue-o na lista para tirá-lo da tela de venda sem perder o histórico."
           acao={acaoRemocao}
           estado={estadoRemocao}
           pendente={removendo}
@@ -279,35 +237,139 @@ export function ModalProduto({
   );
 }
 
-/** Lista de caixas de marcar, para os eixos que a placa oferece na venda. */
-function Marcadores<T extends string>({
-  titulo,
-  nome,
-  opcoes,
-  marcados,
+/**
+ * O que so a placa tem: tamanho, medidas, cores e tecnologia.
+ *
+ * O tamanho vem antes das medidas porque e ele que decide se ha medida para
+ * digitar. Em A6 e A5 os campos mostram as nossas, bloqueados; so
+ * "personalizado" abre a digitacao, e ai aparecem tambem os numeros de grafica.
+ */
+function PlacaDeAvaliacao({
+  tamanho,
+  aoTrocarTamanho,
+  medidas,
 }: {
-  titulo: string;
-  nome: string;
-  opcoes: Array<{ valor: T; rotulo: string }>;
-  marcados: T[];
+  tamanho: TamanhoDePlaca;
+  aoTrocarTamanho: (valor: TamanhoDePlaca) => void;
+  medidas: NonNullable<ProdutoEditavel["produto_avaliacao"]> | null;
 }) {
+  const proprio = tamanho === "personalizado";
+  const preset = proprio ? null : TAMANHOS[tamanho];
+
+  return (
+    <>
+      <Selecao
+        rotulo="Tamanho"
+        name="tamanho"
+        opcoes={OPCOES_DE_TAMANHO}
+        value={tamanho}
+        onChange={(evento) => aoTrocarTamanho(evento.target.value as TamanhoDePlaca)}
+      />
+
+      {/* A `key` remonta os campos ao trocar de tamanho: os de A6 e A5 sao
+          controlados pela constante e os de personalizado sao livres, e o React
+          reclamaria de um virar o outro na mesma posicao. */}
+      <div key={proprio ? "livre" : "fixo"} className="grid gap-4 sm:grid-cols-2">
+        <Campo
+          rotulo="Largura (mm)"
+          name="largura"
+          inputMode="decimal"
+          placeholder="150"
+          bloqueado={!proprio}
+          {...(preset
+            ? { value: preset.largura_mm }
+            : { defaultValue: medidas ? numero(medidas.largura_mm) : "" })}
+          required
+          ajuda={preset ? `Medida do nosso display ${preset.rotulo}.` : undefined}
+        />
+        <Campo
+          rotulo="Altura (mm)"
+          name="altura"
+          inputMode="decimal"
+          placeholder="212"
+          bloqueado={!proprio}
+          {...(preset
+            ? { value: preset.altura_mm }
+            : { defaultValue: medidas ? numero(medidas.altura_mm) : "" })}
+          required
+          ajuda={preset ? "Para outra medida, escolha Personalizado." : undefined}
+        />
+
+        {proprio ? (
+          <>
+            <Campo
+              rotulo="Margem de segurança (mm)"
+              name="margem"
+              inputMode="decimal"
+              placeholder="7"
+              defaultValue={numero(
+                medidas?.margem_seguranca_mm ?? ACABAMENTO_PADRAO.margem_seguranca_mm,
+              )}
+              required
+              ajuda="Área que a arte não invade."
+            />
+            <Campo
+              rotulo="Sangria (mm)"
+              name="sangria"
+              inputMode="decimal"
+              placeholder="0"
+              defaultValue={numero(medidas?.sangria_mm ?? ACABAMENTO_PADRAO.sangria_mm)}
+              required
+              ajuda="O que a gráfica apara."
+            />
+            <Campo
+              rotulo="DPI"
+              name="dpi"
+              type="number"
+              min={72}
+              max={1200}
+              placeholder="300"
+              defaultValue={medidas?.dpi ?? ACABAMENTO_PADRAO.dpi}
+              required
+            />
+          </>
+        ) : null}
+      </div>
+
+      <Cores marcadas={medidas?.cores ?? CORES} />
+
+      <Selecao
+        rotulo="Tecnologia"
+        name="tecnologia"
+        opcoes={TECNOLOGIAS.map((valor) => ({ valor, texto: ROTULO_TECNOLOGIA[valor] }))}
+        defaultValue={medidas?.tecnologia ?? "qr"}
+      />
+    </>
+  );
+}
+
+/**
+ * As cores em que esta placa e vendida.
+ *
+ * Mais de uma, ao contrario da tecnologia: trocar branco por preto nao muda o
+ * custo, entao a cor e escolha do cliente na venda e nao um produto a parte.
+ */
+function Cores({ marcadas }: { marcadas: CorArte[] }) {
   return (
     <div>
-      <p className="mb-2 text-rotulo font-medium text-tinta">{titulo}</p>
-      <div className="flex flex-col gap-2">
-        {opcoes.map((opcao) => (
-          <label key={opcao.valor} className="flex items-center gap-2 text-sm text-tinta">
+      <p className="mb-2 text-rotulo font-medium text-tinta">Cores</p>
+      <div className="flex flex-wrap gap-x-6 gap-y-2">
+        {CORES.map((cor) => (
+          <label key={cor} className="flex cursor-pointer items-center gap-2 text-sm text-tinta">
             <input
               type="checkbox"
-              name={nome}
-              value={opcao.valor}
-              defaultChecked={marcados.includes(opcao.valor)}
+              name="cores"
+              value={cor}
+              defaultChecked={marcadas.includes(cor)}
               className="size-4 accent-marca"
             />
-            {opcao.rotulo}
+            {ROTULO_COR[cor]}
           </label>
         ))}
       </div>
+      <p className="mt-1.5 text-xs text-tinta-suave">
+        O cliente escolhe entre estas na hora da venda.
+      </p>
     </div>
   );
 }

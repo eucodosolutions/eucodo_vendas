@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { renderPreviewPng, renderPrintJpg } from "@/lib/art/render";
 import { specDoProduto } from "@/lib/art/spec";
-import { CORES, TECNOLOGIAS } from "@/lib/catalogo";
+import { CORES } from "@/lib/catalogo";
 import { validarLinkAvaliacao } from "@/lib/formato";
 import { sessaoDoPainel } from "@/lib/supabase/painel";
 import { createClient } from "@/lib/supabase/server";
@@ -18,7 +18,6 @@ export type ItemParaPedido = {
   produtoId: string;
   quantidade: number;
   cor?: CorArte;
-  tecnologia?: TecnologiaArte;
   nomeNegocio?: string;
   linkAvaliacao?: string;
   placeId?: string;
@@ -39,7 +38,6 @@ const esquema = z.object({
         produtoId: z.string().uuid(),
         quantidade: z.coerce.number().int().min(1).max(999),
         cor: z.enum(CORES).optional(),
-        tecnologia: z.enum(TECNOLOGIAS).optional(),
         nomeNegocio: z.string().trim().min(2).optional(),
         linkAvaliacao: z.string().trim().min(1).optional(),
         placeId: z.string().trim().optional(),
@@ -51,7 +49,6 @@ const esquema = z.object({
 type ProdutoDaVenda = {
   id: string;
   tipo: "avaliacao" | "padrao";
-  codigo: string;
   nome: string;
   preco_centavos: number;
   prazo_entrega_dias: number;
@@ -63,7 +60,7 @@ type ProdutoDaVenda = {
     | "sangria_mm"
     | "dpi"
     | "cores"
-    | "tecnologias"
+    | "tecnologia"
   > | null;
 };
 
@@ -99,7 +96,7 @@ export async function criarPedido(
   const { data: catalogo } = await supabase
     .from("produtos")
     .select(
-      "id, tipo, codigo, nome, preco_centavos, prazo_entrega_dias, produto_avaliacao (largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi, cores, tecnologias)",
+      "id, tipo, nome, preco_centavos, prazo_entrega_dias, produto_avaliacao (largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi, cores, tecnologia)",
     )
     .in(
       "id",
@@ -129,9 +126,6 @@ export async function criarPedido(
       }
       if (!item.cor || !placa.cores.includes(item.cor)) {
         return { erro: `${produto.nome} não é mais vendido nessa cor. Revise o carrinho.` };
-      }
-      if (!item.tecnologia || !placa.tecnologias.includes(item.tecnologia)) {
-        return { erro: `${produto.nome} não é mais vendido nessa tecnologia. Revise o carrinho.` };
       }
 
       const link = validarLinkAvaliacao(item.linkAvaliacao);
@@ -182,10 +176,11 @@ export async function criarPedido(
       nome_negocio: ehPlaca ? item.nomeNegocio! : null,
       link_avaliacao: links[indice],
       google_place_id: ehPlaca ? item.placeId || null : null,
-      produto_codigo: produto.codigo,
       produto_nome: produto.nome,
       cor: ehPlaca ? item.cor! : null,
-      tecnologia: ehPlaca ? item.tecnologia! : null,
+      // A tecnologia vem do produto, e nao do carrinho: e o produto que decide,
+      // do mesmo jeito que o preco.
+      tecnologia: ehPlaca ? produto.produto_avaliacao!.tecnologia : null,
       quantidade: item.quantidade,
       preco_unitario_centavos: produto.preco_centavos,
       prazo_entrega_dias: produto.prazo_entrega_dias,

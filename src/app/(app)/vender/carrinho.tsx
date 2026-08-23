@@ -3,7 +3,7 @@
 import { Minus, Plus, Trash2 } from "lucide-react";
 
 import { Secao } from "@/components/ui/secao";
-import { moeda, ROTULO_COR, ROTULO_TECNOLOGIA } from "@/lib/formato";
+import { moeda, ROTULO_COR } from "@/lib/formato";
 import { pecasDoCarrinho, totalDoCarrinho, type ItemDoCarrinho } from "@/lib/carrinho/carrinho";
 
 export function Carrinho({
@@ -91,7 +91,6 @@ function detalhe(item: ItemDoCarrinho): string {
     // O nome do produto so entra quando o titulo ja foi ocupado pelo negocio.
     item.nomeNegocio ? item.produtoNome : null,
     item.cor ? ROTULO_COR[item.cor].toLowerCase() : null,
-    item.tecnologia ? ROTULO_TECNOLOGIA[item.tecnologia].toLowerCase() : null,
   ]
     .filter(Boolean)
     .join(", ");

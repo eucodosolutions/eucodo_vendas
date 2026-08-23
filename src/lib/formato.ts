@@ -104,6 +104,24 @@ export function validarLinkAvaliacao(bruto: string): string | null {
   }
 }
 
+/**
+ * Texto que pode virar nome de arquivo: sem acento, sem espaco, sem barra.
+ *
+ * A arte baixa com o nome do produto dentro, e "Display A5 QR + aproximação"
+ * cru viraria um arquivo com acento e sinal de mais no meio, que cada sistema
+ * operacional trata de um jeito.
+ */
+export function apelidoDeArquivo(texto: string): string {
+  const limpo = texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+
+  return limpo || "arte";
+}
+
 export const ROTULO_COR = { branco: "Branco", preto: "Preto" } as const;
 
 export const ROTULO_TECNOLOGIA = {

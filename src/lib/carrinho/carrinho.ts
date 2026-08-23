@@ -1,4 +1,4 @@
-import type { CorArte, TecnologiaArte, TipoProduto } from "@/types/database";
+import type { CorArte, TipoProduto } from "@/types/database";
 
 /**
  * Uma linha do carrinho: um produto, na quantidade pedida.
@@ -6,18 +6,20 @@ import type { CorArte, TecnologiaArte, TipoProduto } from "@/types/database";
  * Os quatro campos do fim so existem no tipo `avaliacao`. A empresa mora no
  * item, e nao no pedido, porque o caso comum e justamente esse: o cliente na
  * frente pede duas placas, uma para cada negocio dele.
+ *
+ * A tecnologia nao esta aqui: ela e do produto, e nao da linha. Guardar uma
+ * copia dela no navegador so criaria a chance de o carrinho discordar do
+ * catalogo enquanto o cliente decide.
  */
 export type ItemDoCarrinho = {
   /** Id local, so para o React ter chave estavel na lista. */
   chave: string;
   produtoId: string;
   tipo: TipoProduto;
-  produtoCodigo: string;
   produtoNome: string;
   precoUnitarioCentavos: number;
   quantidade: number;
   cor?: CorArte;
-  tecnologia?: TecnologiaArte;
   nomeNegocio?: string;
   linkAvaliacao?: string;
   placeId?: string;
@@ -28,9 +30,10 @@ export type ItemDoCarrinho = {
  *
  * Um carrinho gravado no formato antigo, com `varianteId`, quebraria a venda no
  * primeiro fechamento depois do deploy. Trocar a chave e o jeito barato de o
- * navegador simplesmente comecar vazio.
+ * navegador simplesmente comecar vazio. A v3 e a saida do `produtoCodigo` e da
+ * `tecnologia` da linha.
  */
-export const CHAVE_CARRINHO = "eucodo:carrinho:v2";
+export const CHAVE_CARRINHO = "eucodo:carrinho:v3";
 
 export function totalDoCarrinho(itens: ItemDoCarrinho[]): number {
   return itens.reduce((soma, item) => soma + item.precoUnitarioCentavos * item.quantidade, 0);

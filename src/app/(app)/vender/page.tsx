@@ -19,7 +19,7 @@ export default async function PaginaVender() {
     supabase
       .from("produtos")
       .select(
-        "id, tipo, codigo, nome, descricao, foto_path, preco_centavos, prazo_entrega_dias, produto_avaliacao (largura_mm, altura_mm, cores, tecnologias)",
+        "id, tipo, nome, descricao, foto_path, preco_centavos, prazo_entrega_dias, produto_avaliacao (largura_mm, altura_mm, cores, tecnologia)",
       )
       .eq("ativo", true)
       .order("ordem")
@@ -54,12 +54,12 @@ export default async function PaginaVender() {
         <h1 className="text-lg font-semibold tracking-tight text-tinta">Nenhum produto à venda</h1>
         <p className="mt-2 text-sm text-tinta-suave">
           {ehAssinante
-            ? "Cadastre pelo menos um produto em Ajustes para começar a vender."
-            : "Peça ao dono da conta para cadastrar os produtos em Ajustes."}
+            ? "Cadastre pelo menos um produto em Produtos para começar a vender."
+            : "Peça ao dono da conta para cadastrar os produtos."}
         </p>
         {ehAssinante ? (
           <div className="mt-4">
-            <LinkBotao href="/ajustes">Ir para Ajustes</LinkBotao>
+            <LinkBotao href="/produtos">Ir para Produtos</LinkBotao>
           </div>
         ) : null}
       </Secao>

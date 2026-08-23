@@ -24,6 +24,14 @@ type CampoProps = Omit<InputHTMLAttributes<HTMLInputElement>, "className"> & {
   placeholder: string;
   ajuda?: ReactNode;
   erro?: string;
+  /**
+   * Valor que a tela decidiu, e nao a pessoa: da para ler e copiar, nao editar.
+   *
+   * E o caso das medidas de A6 e A5 no cadastro de produto. Sai `readOnly` e
+   * nao `disabled` de proposito: campo desabilitado nao viaja no formulario, e
+   * a medida precisa chegar ao servidor.
+   */
+  bloqueado?: boolean;
   /** Para quem precisa devolver o foco ao campo, como o carrinho da venda. */
   ref?: Ref<HTMLInputElement>;
 };
@@ -36,7 +44,16 @@ type CampoProps = Omit<InputHTMLAttributes<HTMLInputElement>, "className"> & {
  * todo campo pede placeholder. Senha digitada as cegas no celular, no meio de
  * uma venda, e erro de digitacao garantido.
  */
-export function Campo({ rotulo, ajuda, erro, id, ref, type = "text", ...props }: CampoProps) {
+export function Campo({
+  rotulo,
+  ajuda,
+  erro,
+  bloqueado,
+  id,
+  ref,
+  type = "text",
+  ...props
+}: CampoProps) {
   const gerado = useId();
   const campoId = id ?? props.name ?? gerado;
   const ajudaId = ajuda ? `${campoId}-ajuda` : undefined;
@@ -57,6 +74,7 @@ export function Campo({ rotulo, ajuda, erro, id, ref, type = "text", ...props }:
           ref={ref}
           id={campoId}
           type={ehSenha && revelada ? "text" : type}
+          readOnly={bloqueado || props.readOnly}
           aria-invalid={erro ? true : undefined}
           aria-describedby={[ajudaId, erroId].filter(Boolean).join(" ") || undefined}
           className={juntar(
@@ -64,6 +82,7 @@ export function Campo({ rotulo, ajuda, erro, id, ref, type = "text", ...props }:
             ALTURA_CONTROLE,
             erro ? BORDA_ERRO : BORDA_NORMAL,
             "px-3 placeholder:text-tinta-suave/70",
+            bloqueado && "bg-papel text-tinta-media",
             ehSenha && "pr-11",
           )}
         />

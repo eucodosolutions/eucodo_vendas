@@ -1,13 +1,16 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 
+import { alternarProduto } from "./actions";
 import { ModalProduto, type ProdutoEditavel } from "./modal-produto";
+import { avisar } from "@/components/ui/avisos";
 import { Botao } from "@/components/ui/botao";
 import { CabecalhoDePagina } from "@/components/ui/cabecalho-de-pagina";
 import { CartaoDeLista } from "@/components/ui/cartao-de-lista";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
+import { Interruptor } from "@/components/ui/interruptor";
 import { moeda, ROTULO_TIPO_PRODUTO } from "@/lib/formato";
 
 /** Fechado, ou aberto em `produto` (que sendo nulo quer dizer produto novo). */
@@ -15,6 +18,26 @@ type Edicao = { produto: ProdutoEditavel | null } | null;
 
 export function ListaDeProdutos({ produtos }: { produtos: ProdutoEditavel[] }) {
   const [edicao, setEdicao] = useState<Edicao>(null);
+  const [, iniciar] = useTransition();
+
+  // O interruptor responde no toque e so depois confirma com o servidor. Um
+  // toggle que fica meio segundo parado esperando resposta parece quebrado, e
+  // quem esta desligando tres produtos seguidos toca de novo achando que falhou.
+  const [lista, alternarOtimista] = useOptimistic(
+    produtos,
+    (atual: ProdutoEditavel[], mudanca: { id: string; ativo: boolean }) =>
+      atual.map((item) => (item.id === mudanca.id ? { ...item, ativo: mudanca.ativo } : item)),
+  );
+
+  function alternar(produto: ProdutoEditavel, ativo: boolean) {
+    iniciar(async () => {
+      alternarOtimista({ id: produto.id, ativo });
+
+      const resposta = await alternarProduto(produto.id, ativo);
+      if (resposta.erro) avisar.erro(resposta.erro);
+      else if (resposta.sucesso) avisar.sucesso(resposta.sucesso);
+    });
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -29,7 +52,7 @@ export function ListaDeProdutos({ produtos }: { produtos: ProdutoEditavel[] }) {
         }
       />
 
-      {produtos.length === 0 ? (
+      {lista.length === 0 ? (
         <EstadoVazio
           mensagem="Nenhum produto no catálogo ainda."
           acao={
@@ -40,24 +63,24 @@ export function ListaDeProdutos({ produtos }: { produtos: ProdutoEditavel[] }) {
         />
       ) : (
         <ul className="flex flex-col gap-2">
-          {produtos.map((produto) => (
+          {lista.map((produto) => (
             <li key={produto.id}>
-              <CartaoDeLista onClick={() => setEdicao({ produto })}>
-                <div className="min-w-0">
-                  <p className="truncate text-base font-medium text-tinta">
-                    {produto.nome}
-                    {produto.ativo ? "" : " (fora da venda)"}
-                  </p>
+              <CartaoDeLista
+                onClick={() => setEdicao({ produto })}
+                acao={
+                  <Interruptor
+                    ligado={produto.ativo}
+                    rotulo={`${produto.nome} à venda`}
+                    onChange={(ativo) => alternar(produto, ativo)}
+                  />
+                }
+              >
+                <div className={produto.ativo ? "min-w-0" : "min-w-0 opacity-60"}>
+                  <p className="truncate text-base font-medium text-tinta">{produto.nome}</p>
                   <p className="text-sm text-tinta-suave tabular-nums">
-                    {ROTULO_TIPO_PRODUTO[produto.tipo]} · {moeda(produto.preco_centavos)} ·{" "}
-                    {produto.comissao_percentual}% de comissão
+                    {detalhe(produto)}
                   </p>
                 </div>
-                <span className="shrink-0 text-xs text-tinta-suave tabular-nums">
-                  {produto.prazo_entrega_dias === 1
-                    ? "1 dia"
-                    : `${produto.prazo_entrega_dias} dias`}
-                </span>
               </CartaoDeLista>
             </li>
           ))}
@@ -77,4 +100,15 @@ export function ListaDeProdutos({ produtos }: { produtos: ProdutoEditavel[] }) {
       ) : null}
     </div>
   );
+}
+
+function detalhe(produto: ProdutoEditavel): string {
+  const dias = produto.prazo_entrega_dias === 1 ? "1 dia" : `${produto.prazo_entrega_dias} dias`;
+
+  return [
+    ROTULO_TIPO_PRODUTO[produto.tipo],
+    moeda(produto.preco_centavos),
+    `${produto.comissao_percentual}% de comissão`,
+    dias,
+  ].join(" · ");
 }

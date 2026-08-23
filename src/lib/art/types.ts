@@ -6,8 +6,6 @@ export type ArtTech = "qr" | "qr_nfc";
  * codigo: cada cliente do sistema pode cadastrar o proprio tamanho sem deploy.
  */
 export type ArtSpec = {
-  /** Identificador curto, aparece no painel e no nome do arquivo. */
-  code: string;
   label: string;
   widthMm: number;
   heightMm: number;
@@ -26,28 +24,6 @@ export type ArtInput = {
   businessName: string;
   /** Link de avaliacao do Google que vira o QR code. */
   reviewUrl: string;
-};
-
-/** Formatos que ja saem cadastrados. Servem de semente do catalogo da conta. */
-export const DEFAULT_SPECS: Record<string, ArtSpec> = {
-  A6: {
-    code: "A6",
-    label: "A6",
-    widthMm: 107,
-    heightMm: 150,
-    safeMarginMm: 7,
-    bleedMm: 0,
-    dpi: 300,
-  },
-  A5: {
-    code: "A5",
-    label: "A5",
-    widthMm: 150,
-    heightMm: 212,
-    safeMarginMm: 7,
-    bleedMm: 0,
-    dpi: 300,
-  },
 };
 
 export function mmToPx(mm: number, dpi: number): number {

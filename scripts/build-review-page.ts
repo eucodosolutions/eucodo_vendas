@@ -1,7 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { renderPreviewPng } from "../src/lib/art/render";
-import { DEFAULT_SPECS, type ArtColor, type ArtTech } from "../src/lib/art/types";
+import { type ArtColor, type ArtTech } from "../src/lib/art/types";
+import { specDoTamanho, TAMANHOS } from "../src/lib/catalogo";
 
 /**
  * Monta a pagina de aprovacao da arte com as previas embutidas em base64.
@@ -19,7 +20,7 @@ const SLOTS: Array<{
   color: ArtColor;
   tech: ArtTech;
   business: string;
-  size?: keyof typeof DEFAULT_SPECS;
+  size?: keyof typeof TAMANHOS;
   safeArea?: boolean;
 }> = [
   { token: "IMG_BRANCO_NFC", color: "branco", tech: "qr_nfc", business: "Barbearia Vintage" },
@@ -40,7 +41,7 @@ const SLOTS: Array<{
     business: "Barbearia Vintage",
     safeArea: true,
   },
-  { token: "IMG_A5", color: "branco", tech: "qr_nfc", business: "Barbearia Vintage", size: "A5" },
+  { token: "IMG_A5", color: "branco", tech: "qr_nfc", business: "Barbearia Vintage", size: "a5" },
 ];
 
 async function main() {
@@ -49,7 +50,7 @@ async function main() {
   for (const slot of SLOTS) {
     const png = await renderPreviewPng(
       {
-        spec: DEFAULT_SPECS[slot.size ?? "A6"],
+        spec: specDoTamanho(slot.size ?? "a6"),
         color: slot.color,
         tech: slot.tech,
         businessName: slot.business,

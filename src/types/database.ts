@@ -61,7 +61,6 @@ export type Produto = {
   id: string;
   assinatura_id: string;
   tipo: TipoProduto;
-  codigo: string;
   nome: string;
   descricao: string | null;
   /** So no tipo padrao. A imagem da placa e a arte gerada no pedido. */
@@ -85,7 +84,8 @@ export type ProdutoAvaliacao = {
   sangria_mm: number;
   dpi: number;
   cores: CorArte[];
-  tecnologias: TecnologiaArte[];
+  /** Uma so: QR e QR+NFC nao custam o mesmo, entao cada uma e um produto. */
+  tecnologia: TecnologiaArte;
 };
 
 export type Cliente = {
@@ -144,7 +144,6 @@ export type PedidoItem = {
   nome_negocio: string | null;
   link_avaliacao: string | null;
   google_place_id: string | null;
-  produto_codigo: string;
   produto_nome: string;
   cor: CorArte | null;
   tecnologia: TecnologiaArte | null;
@@ -229,7 +228,7 @@ export type Database = {
       perfis: Tabela<Perfil, Pick<Perfil, "id" | "nome" | "email"> & Partial<Perfil>>;
       produtos: Tabela<
         Produto,
-        Pick<Produto, "assinatura_id" | "tipo" | "codigo" | "nome" | "preco_centavos"> &
+        Pick<Produto, "assinatura_id" | "tipo" | "nome" | "preco_centavos"> &
           Partial<Produto>
       >;
       produto_avaliacao: Tabela<ProdutoAvaliacao>;

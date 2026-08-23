@@ -66,13 +66,12 @@ export function useCarrinho() {
   const adicionar = useCallback((item: Omit<ItemDoCarrinho, "chave">) => {
     const atuais = instantaneo();
 
-    // O mesmo produto, na mesma configuracao e para a mesma empresa, vira
-    // quantidade e nao linha repetida.
+    // O mesmo produto, na mesma cor e para a mesma empresa, vira quantidade e
+    // nao linha repetida.
     const igual = atuais.findIndex(
       (linha) =>
         linha.produtoId === item.produtoId &&
         linha.cor === item.cor &&
-        linha.tecnologia === item.tecnologia &&
         negocio(linha.nomeNegocio) === negocio(item.nomeNegocio),
     );
 

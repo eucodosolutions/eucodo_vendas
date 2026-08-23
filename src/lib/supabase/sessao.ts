@@ -65,7 +65,10 @@ export async function atualizarSessao(request: NextRequest) {
   if (!user && !ehPublica) {
     const url = request.nextUrl.clone();
     url.pathname = "/entrar";
-    url.searchParams.set("proxima", pathname);
+    url.search = "";
+    // A raiz so redireciona para /vender, que ja e o destino padrao do login:
+    // guardar `proxima=/` so sujaria a URL de quem entra pela porta da frente.
+    if (pathname !== "/") url.searchParams.set("proxima", pathname);
     return NextResponse.redirect(url);
   }
 
