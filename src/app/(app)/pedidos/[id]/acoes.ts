@@ -40,6 +40,7 @@ const esquemaPagamento = z.object({
 const esquemaCancelamento = z.object({
   pedidoId: z.string().uuid(),
   motivo: z.string().trim().min(3, "Escreva o motivo do cancelamento."),
+  avisar: z.enum(["sim", "nao"]).default("sim"),
 });
 
 async function sessao() {
@@ -148,6 +149,7 @@ export async function cancelarPedido(_estado: EstadoAcao, dados: FormData): Prom
   const resultado = esquemaCancelamento.safeParse({
     pedidoId: dados.get("pedidoId"),
     motivo: dados.get("motivo"),
+    avisar: dados.get("avisar") ?? undefined,
   });
   if (!resultado.success) {
     return { erro: resultado.error.issues[0]?.message ?? "Escreva o motivo." };
@@ -182,20 +184,26 @@ export async function cancelarPedido(_estado: EstadoAcao, dados: FormData): Prom
     tipo: "cancelamento",
     de: pedido.status,
     para: "cancelado",
-    detalhe: resultado.data.motivo,
+    detalhe: `${resultado.data.motivo}${
+      resultado.data.avisar === "sim" ? "" : " (cliente nao avisado)"
+    }`,
     autorId: user.id,
   });
 
-  const envio = await enviarWhatsapp(resultado.data.pedidoId, "status_cancelado", {
-    semArte: true,
-  });
+  // Nem todo cancelamento merece mensagem: quando o cliente ja desistiu na
+  // conversa, ou quando o pedido foi aberto errado e ele nunca soube dele,
+  // avisar so confunde. O motivo continua obrigatorio, no historico.
+  const envio =
+    resultado.data.avisar === "sim"
+      ? await enviarWhatsapp(resultado.data.pedidoId, "status_cancelado", { semArte: true })
+      : null;
 
   revalidatePath(`/pedidos/${resultado.data.pedidoId}`);
   revalidatePath("/pedidos");
 
   return {
     sucesso: mensagemDeEnvio("Pedido cancelado.", envio),
-    link: envio.enviado ? undefined : envio.link,
+    link: envio && !envio.enviado ? envio.link : undefined,
   };
 }
 
