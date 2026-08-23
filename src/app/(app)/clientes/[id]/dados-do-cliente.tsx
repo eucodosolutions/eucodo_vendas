@@ -74,25 +74,12 @@ export function DadosDoCliente({
         }
       >
         <dl className="grid gap-4 sm:grid-cols-2">
+          {/* O link de avaliacao nao mora mais aqui: ele e do negocio, e nao de
+              quem paga. Seu Joao leva uma placa do deposito dele e outra da
+              doceria da vizinha no mesmo pedido — dois negocios, dois donos,
+              dois links, um cliente so. O link nasce no item da venda. */}
           <Dado rotulo="Nome" valor={cliente.nome} />
           <Dado rotulo="WhatsApp" valor={whatsappLegivel(cliente.whatsapp)} />
-          <Dado
-            rotulo="Link de avaliação"
-            valor={
-              cliente.link_avaliacao ? (
-                <a
-                  href={cliente.link_avaliacao}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="break-all text-marca hover:underline"
-                >
-                  {cliente.link_avaliacao}
-                </a>
-              ) : (
-                "Não cadastrado"
-              )
-            }
-          />
           <Dado rotulo="Observações" valor={cliente.observacoes ?? "Nenhuma"} />
         </dl>
 
