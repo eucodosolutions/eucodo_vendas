@@ -38,12 +38,13 @@ export function AcoesDoPedido({
   pedidoId,
   status,
   pagamento,
-  temArte,
+  faltaArte,
 }: {
   pedidoId: string;
   status: StatusPedido;
   pagamento: StatusPagamento;
-  temArte: boolean;
+  /** Algum item do pedido ficou sem arquivo, entao o botao muda de texto. */
+  faltaArte: boolean;
 }) {
   const [estadoStatus, acaoStatus] = useActionState<EstadoAcao, FormData>(mudarStatus, {});
   const [estadoPagamento, acaoPagamento] = useActionState<EstadoAcao, FormData>(marcarPago, {});
@@ -110,14 +111,14 @@ export function AcoesDoPedido({
           <form action={acaoEnvio}>
             <input type="hidden" name="pedidoId" value={pedidoId} />
             <Botao type="submit" variante="secundario" carregandoTexto="Enviando...">
-              Mandar a arte no WhatsApp
+              Mandar as artes no WhatsApp
             </Botao>
           </form>
 
           <form action={acaoArte}>
             <input type="hidden" name="pedidoId" value={pedidoId} />
             <Botao type="submit" variante="secundario" carregandoTexto="Gerando...">
-              {temArte ? "Gerar a arte de novo" : "Gerar a arte"}
+              {faltaArte ? "Gerar as artes que faltam" : "Gerar as artes de novo"}
             </Botao>
           </form>
         </div>

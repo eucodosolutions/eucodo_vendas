@@ -1,33 +1,31 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { Navegacao } from "@/components/navegacao";
-import { createClient } from "@/lib/supabase/server";
+import { Painel } from "@/components/navegacao/painel";
+import { motivoDoBloqueio, sessaoDoPainel } from "@/lib/supabase/painel";
 
-export default async function LayoutPainel({ children }: { children: ReactNode }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export default async function LayoutDoAssinante({ children }: { children: ReactNode }) {
+  const sessao = await sessaoDoPainel();
 
-  if (!user) redirect("/entrar");
+  if (!sessao) redirect("/entrar");
 
-  const { data: perfil } = await supabase
-    .from("perfis")
-    .select("nome, papel, status")
-    .eq("id", user.id)
-    .single();
+  // O admin opera a plataforma, nao vende. Se cair aqui, volta para o painel dele.
+  if (sessao.perfil.papel === "admin") redirect("/admin");
 
-  // O proxy ja barra quem nao tem sessao. Aqui barramos quem tem sessao mas
-  // ainda nao foi liberado, que e um estado possivel logo apos o cadastro.
-  if (!perfil || perfil.status !== "ativo") {
-    redirect("/entrar?erro=acesso_pendente");
-  }
+  const bloqueio = motivoDoBloqueio(sessao);
+  if (bloqueio) redirect(`/entrar?erro=${bloqueio}`);
+
+  // Senha que o assinante gerou nao abre o painel: serve para entrar uma vez e
+  // trocar. A tela de troca vive fora deste layout, senao o desvio se morderia.
+  if (sessao.perfil.senha_temporaria) redirect("/trocar-senha");
 
   return (
-    <div className="flex min-h-full flex-col">
-      <Navegacao nome={perfil.nome} ehAdmin={perfil.papel === "admin"} />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-5 py-7">{children}</main>
-    </div>
+    <Painel
+      papel={sessao.perfil.papel}
+      nome={sessao.perfil.nome}
+      conta={sessao.conta?.nome ?? sessao.perfil.nome}
+    >
+      {children}
+    </Painel>
   );
 }
