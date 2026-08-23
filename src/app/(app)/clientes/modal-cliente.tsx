@@ -20,16 +20,25 @@ export type ClienteGravado = { id: string; nome: string; whatsapp: string };
  * Nome e WhatsApp sao obrigatorios, e o resto e conveniencia: o numero e o que
  * amarra o cliente ao historico e o destino de tudo que o sistema manda, entao
  * nao existe cliente sem ele.
+ *
+ * Os dois sugeridos servem a quem chega pela busca do fechamento: o vendedor ja
+ * digitou o nome (ou o numero) uma vez para procurar, e digitar de novo no
+ * cadastro e a chance de sair diferente do que ele acabou de ler na tela.
  */
 export function ModalCliente({
   aberto,
   aoFechar,
   cliente,
+  nomeSugerido,
+  whatsappSugerido,
   aoSalvar,
 }: {
   aberto: boolean;
   aoFechar: () => void;
   cliente?: ClienteEditavel;
+  /** Ignorados na edicao, onde o que vale e o que ja esta gravado. */
+  nomeSugerido?: string;
+  whatsappSugerido?: string;
   /**
    * Chamado depois de gravar, para quem precisa seguir com o cliente na mao —
    * a tela de venda escolhe na hora o que acabou de cadastrar.
@@ -73,10 +82,14 @@ export function ModalCliente({
           name="nome"
           placeholder="Barbearia Vintage"
           autoComplete="off"
-          defaultValue={cliente?.nome}
+          defaultValue={cliente?.nome ?? nomeSugerido}
           required
         />
-        <CampoWhatsapp required valorInicial={cliente?.whatsapp ?? ""} autoComplete="off" />
+        <CampoWhatsapp
+          required
+          valorInicial={cliente?.whatsapp ?? whatsappSugerido ?? ""}
+          autoComplete="off"
+        />
       </div>
 
       {/* Nao ha link de avaliacao aqui de proposito: ele e do negocio, e o

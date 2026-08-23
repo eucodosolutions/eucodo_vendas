@@ -84,7 +84,7 @@ Deno.serve(async (requisicao) => {
   const { data: pedido } = await supabase
     .from("pedidos")
     .select(
-      "id, codigo, assinatura_id, total_centavos, prazo_entrega_dias, pix_copia_e_cola, clientes (nome, whatsapp), pedido_itens (ordem, nome_negocio, produto_nome, cor, tecnologia, quantidade, total_centavos, arte_preview_path)",
+      "id, codigo, assinatura_id, criado_por, total_centavos, prazo_entrega_dias, pix_copia_e_cola, clientes (nome, whatsapp), pedido_itens (ordem, nome_negocio, produto_nome, cor, tecnologia, quantidade, total_centavos, arte_preview_path)",
     )
     .eq("id", corpo.pedidoId)
     .single();
@@ -336,7 +336,16 @@ async function montarTexto(
     })
     .join("\n");
 
+  // Duas consultas a mais so quando o modelo pede a assinatura. Os avisos de
+  // status nao pedem, e sao a maioria do que sai daqui.
+  const { vendedor, empresa, remetente } = /\{(vendedor|empresa|remetente)\}/.test(modelo.corpo)
+    ? await quemAssina(supabase, pedido)
+    : { vendedor: "", empresa: "", remetente: "" };
+
   const valores: Record<string, string> = {
+    vendedor,
+    empresa,
+    remetente,
     cliente: pedido.clientes?.nome ?? "",
     nome_negocio: primeiro?.nome_negocio ?? pedido.clientes?.nome ?? "",
     codigo: pedido.codigo,
@@ -349,7 +358,7 @@ async function montarTexto(
     prazo: prazoLegivel(pedido.prazo_entrega_dias),
     // Montado no fechamento e gravado no pedido, e nao remontado aqui: o codigo
     // carrega o total e o numero daquele pedido, e a chave PIX da conta pode
-    // ter mudado desde entao. So o modelo `pedido_criado_pix` le esta chave.
+    // ter mudado desde entao. So o modelo `pedido_criado_pix_agora` le esta chave.
     pix: pedido.pix_copia_e_cola ?? "",
   };
 
@@ -357,6 +366,56 @@ async function montarTexto(
     /\{(\w+)\}/g,
     (original: string, chaveDoCampo: string) => valores[chaveDoCampo] ?? original,
   );
+}
+
+/**
+ * De quem o cliente esta recebendo a mensagem.
+ *
+ * Os modelos sao da plataforma e valem para toda conta, entao a assinatura nao
+ * pode estar escrita neles: ate aqui todo assinante se apresentava ao cliente
+ * dele como "a Eucodo Solutions". Quem assina e quem fechou o pedido, e o papel
+ * dessa pessoa decide se a empresa entra junto.
+ *
+ * O assinante e a empresa, entao ele assina com as duas coisas: "Fulano, da
+ * Empresa". O vendedor nao — ele indica e ganha comissao, nao trabalha ali.
+ * Poe-lo como "da Empresa" seria apresenta-lo ao cliente como funcionario de
+ * uma casa que nao e dele, e o cliente passaria a cobrar dele o que e da
+ * empresa: prazo, troca, nota. Ele assina so com o proprio nome.
+ *
+ * `criado_por` e nulo no pedido que entrou pelo link publico, e ai a conta
+ * assina sozinha. Nesse caso `{vendedor}` sai vazio de proposito: quem monta a
+ * frase inteira e `{remetente}`.
+ */
+async function quemAssina(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  // deno-lint-ignore no-explicit-any
+  pedido: any,
+): Promise<{ vendedor: string; empresa: string; remetente: string }> {
+  const [{ data: conta }, { data: perfil }] = await Promise.all([
+    supabase.from("assinaturas").select("nome").eq("id", pedido.assinatura_id).maybeSingle(),
+    pedido.criado_por
+      ? supabase.from("perfis").select("nome, papel").eq("id", pedido.criado_por).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const empresa = (conta?.nome ?? "").trim();
+  const vendedor = (perfil?.nome ?? "").trim();
+
+  if (vendedor && perfil?.papel === "vendedor") {
+    return { vendedor, empresa, remetente: vendedor };
+  }
+
+  // Daqui para baixo e o assinante, e a frase precisa continuar de pe com um
+  // nome so: conta sem nome, pedido sem autor, ou o assinante que batizou a
+  // conta com o proprio nome e nao vai se apresentar duas vezes.
+  const remetente = !empresa
+    ? vendedor
+    : !vendedor || vendedor === empresa
+      ? empresa
+      : `${vendedor}, da ${empresa}`;
+
+  return { vendedor, empresa, remetente };
 }
 
 function prazoLegivel(dias: number | null): string {

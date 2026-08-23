@@ -9,18 +9,20 @@ import { avisar } from "@/components/ui/avisos";
 import { Botao } from "@/components/ui/botao";
 import { Campo } from "@/components/ui/campo";
 import { Escolha } from "@/components/ui/escolha";
+import { Interruptor } from "@/components/ui/interruptor";
 import { Modal } from "@/components/ui/modal";
 import { totalDoCarrinho, type ItemDoCarrinho } from "@/lib/carrinho/carrinho";
 import { moeda } from "@/lib/formato";
 import type { FormaCombinada, MomentoPagamento } from "@/types/database";
 
 /**
- * O fecho do pedido: para quem e, como paga, e quando paga.
+ * O fecho do pedido: para quem e, quando paga, como paga.
  *
- * As duas perguntas de pagamento sao separadas de proposito. "PIX" diz por onde
- * o dinheiro entra; "pagar agora" diz se a cobranca sai junto da mensagem. So a
- * combinacao das duas — PIX e agora — manda o copia e cola no WhatsApp; o resto
- * fecha o pedido e deixa o acerto para a conversa.
+ * As duas perguntas de pagamento sao separadas de proposito, e nesta ordem.
+ * "Pagar agora" e a decisao que muda a conversa — ela diz se a cobranca sai
+ * junto da mensagem; "PIX" so diz por onde o dinheiro entra. Perguntar a forma
+ * primeiro fazia o vendedor escolher PIX e so depois descobrir que aquilo ainda
+ * podia virar uma promessa para a semana que vem.
  *
  * Combinar nao e receber: em nenhum caso o pedido nasce pago. A baixa continua
  * sendo o "Marcar como pago" da tela do pedido, no dia em que o dinheiro cair.
@@ -44,17 +46,22 @@ export function ModalFechamento({
     cliente: ClienteDaLista;
     forma: FormaCombinada;
     momento: MomentoPagamento;
+    avisarCliente: boolean;
     observacoes: string;
   }) => void;
   fechando: boolean;
 }) {
   const [cliente, setCliente] = useState<ClienteDaLista | null>(null);
-  const [forma, setForma] = useState<FormaCombinada>("pix");
   const [momento, setMomento] = useState<MomentoPagamento>("agora");
+  const [forma, setForma] = useState<FormaCombinada>("pix");
+  const [avisarCliente, setAvisarCliente] = useState(true);
   const [observacoes, setObservacoes] = useState("");
 
   const total = totalDoCarrinho(itens);
-  const mandaPix = forma === "pix" && momento === "agora";
+
+  // A unica combinacao que promete cobranca dentro da mensagem, e a unica que
+  // depende de Ajustes estar preenchido.
+  const faltaChavePix = forma === "pix" && momento === "agora" && !pixConfigurado;
 
   function confirmar() {
     if (!cliente) {
@@ -62,7 +69,7 @@ export function ModalFechamento({
       return;
     }
 
-    aoConfirmar({ cliente, forma, momento, observacoes: observacoes.trim() });
+    aoConfirmar({ cliente, forma, momento, avisarCliente, observacoes: observacoes.trim() });
   }
 
   return (
@@ -77,7 +84,11 @@ export function ModalFechamento({
             Voltar
           </Botao>
           <Botao type="button" onClick={confirmar} disabled={!cliente || fechando}>
-            {fechando ? "Fechando o pedido..." : "Confirmar e mandar no WhatsApp"}
+            {fechando
+              ? "Fechando o pedido..."
+              : avisarCliente
+                ? "Confirmar e mandar no WhatsApp"
+                : "Confirmar sem avisar"}
           </Botao>
         </>
       }
@@ -92,16 +103,6 @@ export function ModalFechamento({
 
         <section className="flex flex-col gap-4">
           <Escolha
-            titulo="Forma de pagamento"
-            opcoes={[
-              { valor: "pix", rotulo: "PIX", detalhe: "Copia e cola" },
-              { valor: "dinheiro", rotulo: "Dinheiro", detalhe: "Acerta pessoalmente" },
-            ]}
-            selecionado={forma}
-            aoSelecionar={setForma}
-          />
-
-          <Escolha
             titulo="Quando paga"
             opcoes={[
               { valor: "agora", rotulo: "Pagar agora", detalhe: "Cobra no fechamento" },
@@ -111,21 +112,44 @@ export function ModalFechamento({
             aoSelecionar={setMomento}
           />
 
-          {mandaPix ? (
-            pixConfigurado ? (
-              <p className="text-sm text-tinta-suave">
-                A mensagem vai com o PIX copia e cola de {moeda(total)}, já com o valor dentro.
-              </p>
-            ) : (
-              <p className="flex items-start gap-2 rounded-lg bg-atencao-suave p-3 text-sm text-atencao">
-                <AlertTriangle size={16} aria-hidden className="mt-0.5 shrink-0" />
-                <span>
-                  Sua conta ainda não tem chave PIX em Ajustes, então a mensagem vai sem o copia e
-                  cola. O pedido fecha do mesmo jeito.
-                </span>
-              </p>
-            )
+          <Escolha
+            titulo="Forma de pagamento"
+            opcoes={[
+              { valor: "pix", rotulo: "PIX", detalhe: "Copia e cola" },
+              { valor: "dinheiro", rotulo: "Dinheiro", detalhe: "Acerta pessoalmente" },
+            ]}
+            selecionado={forma}
+            aoSelecionar={setForma}
+          />
+
+          {/* O aviso da chave que falta sai mesmo com o WhatsApp desligado: ele
+              nao e sobre esta mensagem, e sobre o pedido nao guardar cobranca
+              nenhuma para mandar depois. */}
+          {faltaChavePix ? (
+            <p className="flex items-start gap-2 rounded-lg bg-atencao-suave p-3 text-sm text-atencao">
+              <AlertTriangle size={16} aria-hidden className="mt-0.5 shrink-0" />
+              <span>
+                Sua conta ainda não tem chave PIX em Ajustes, então o pedido fecha sem o copia e
+                cola. O acerto vai ter que ser combinado na conversa.
+              </span>
+            </p>
           ) : null}
+
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-borda bg-papel p-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-tinta">Avisar o cliente no WhatsApp</p>
+              <p className="mt-0.5 text-sm text-tinta-suave">
+                {avisarCliente
+                  ? mensagemDoCombinado({ forma, momento, total, pixConfigurado })
+                  : "O pedido fecha calado. A mensagem continua a um toque na tela do pedido."}
+              </p>
+            </div>
+            <Interruptor
+              ligado={avisarCliente}
+              rotulo="Avisar o cliente no WhatsApp"
+              onChange={setAvisarCliente}
+            />
+          </div>
         </section>
 
         <Campo
@@ -153,4 +177,37 @@ export function ModalFechamento({
       </div>
     </Modal>
   );
+}
+
+/**
+ * O que a mensagem vai dizer, na frase de quem esta olhando a tela.
+ *
+ * Existe porque cada um dos quatro combinados manda um texto diferente para o
+ * cliente, e o vendedor precisa saber qual antes de apertar o botao: ate aqui a
+ * tela so falava do PIX a vista e ficava muda nos outros tres.
+ */
+function mensagemDoCombinado({
+  forma,
+  momento,
+  total,
+  pixConfigurado,
+}: {
+  forma: FormaCombinada;
+  momento: MomentoPagamento;
+  total: number;
+  pixConfigurado: boolean;
+}): string {
+  if (forma === "dinheiro") {
+    return momento === "agora"
+      ? `A mensagem diz que o acerto é em dinheiro, ${moeda(total)}, agora no fechamento.`
+      : `A mensagem diz que o acerto é em dinheiro, ${moeda(total)}, na hora da entrega.`;
+  }
+
+  if (momento === "na_entrega") {
+    return "A mensagem diz que o PIX é na entrega, e que você manda o copia e cola na hora.";
+  }
+
+  return pixConfigurado
+    ? `A mensagem vai com o PIX copia e cola de ${moeda(total)}, já com o valor dentro.`
+    : "Sem chave PIX em Ajustes, a mensagem vai sem o copia e cola e deixa o acerto para a conversa.";
 }

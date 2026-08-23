@@ -145,11 +145,12 @@ export function VendaRapida({
         clientes={clientes}
         pixConfigurado={pixConfigurado}
         fechando={fechando}
-        aoConfirmar={({ cliente, forma, momento, observacoes }) =>
+        aoConfirmar={({ cliente, forma, momento, avisarCliente, observacoes }) =>
           fechar({
             clienteId: cliente.id,
             forma,
             momento,
+            avisarCliente,
             observacoes: observacoes || undefined,
             itens: carrinho.itens.map((item) => ({
               produtoId: item.produtoId,
