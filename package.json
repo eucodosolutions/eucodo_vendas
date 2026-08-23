@@ -10,7 +10,8 @@
     "build:check": "next build",
     "typecheck": "tsc --noEmit",
     "arte:previa": "tsx scripts/preview-art.ts",
-    "arte:aprovacao": "tsx scripts/build-review-page.ts"
+    "arte:aprovacao": "tsx scripts/build-review-page.ts",
+    "icones": "tsx scripts/build-icons.ts"
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",

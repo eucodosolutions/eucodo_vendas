@@ -13,14 +13,12 @@ export function FormularioCriarConta() {
   const [estado, acao] = useActionState<EstadoFormulario, FormData>(criarConta, {});
   useAviso(estado);
 
-  // A espera pela liberacao e estado da tela, nao aviso passageiro: quem
-  // acabou de se cadastrar precisa continuar lendo isso depois do toast sumir.
+  // O aviso de que deu certo sai no toast, como em todo o sistema. O que fica
+  // na tela e so o estado novo: o formulario ja foi, resta esperar a liberacao.
   if (estado.sucesso) {
     return (
       <div className="flex flex-col gap-4">
-        <p className="rounded-lg bg-sucesso-suave px-3.5 py-3 text-sm font-medium text-sucesso">
-          {estado.sucesso}
-        </p>
+        <p className="text-sm text-tinta-suave">{estado.sucesso}</p>
         <Link href="/entrar" className="text-sm font-medium text-marca hover:underline">
           Voltar para o login
         </Link>
@@ -37,6 +35,14 @@ export function FormularioCriarConta() {
         autoComplete="name"
         required
         autoFocus
+      />
+      <Campo
+        rotulo="Nome do seu negócio"
+        name="negocio"
+        placeholder="Eucodo Solutions"
+        autoComplete="organization"
+        required
+        ajuda="É o nome da sua conta no sistema, e o que sua equipe vê no painel."
       />
       <Campo
         rotulo="E-mail"

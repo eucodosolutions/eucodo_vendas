@@ -7,6 +7,10 @@
 // Quando nao ha instancia conectada (assinante sem instancia, ou que parou de
 // pagar), o envio nao falha: a funcao devolve um link formatado do WhatsApp
 // para o vendedor abrir e mandar na mao. A venda nunca fica refem da API.
+//
+// O pedido tem itens, e cada item tem a propria arte. O envio e um texto de
+// resumo mais uma imagem por item: o cliente precisa ver a placa de cada
+// negocio dele, nao so a primeira.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { CABECALHOS_CORS, responder } from "../_shared/cors.ts";
@@ -78,23 +82,30 @@ Deno.serve(async (requisicao) => {
   const { data: pedido } = await supabase
     .from("pedidos")
     .select(
-      "id, codigo, nome_negocio, whatsapp, tamanho_codigo, cor, tecnologia, quantidade, total_centavos, arte_preview_path",
+      "id, codigo, assinatura_id, total_centavos, prazo_entrega_dias, clientes (nome, whatsapp), pedido_itens (ordem, nome_negocio, produto_nome, cor, tecnologia, quantidade, total_centavos, arte_preview_path)",
     )
     .eq("id", corpo.pedidoId)
     .single();
 
   if (!pedido) return responder({ erro: "Pedido não encontrado." }, 404);
+  if (!pedido.clientes) return responder({ erro: "Pedido sem cliente." }, 409);
 
-  const texto = corpo.textoManual ?? (await montarTexto(supabase, corpo.chave, pedido));
+  const destino = pedido.clientes.whatsapp as string;
+  const itens = [...(pedido.pedido_itens ?? [])].sort(
+    (a: { ordem: number }, b: { ordem: number }) => a.ordem - b.ordem,
+  );
+
+  const texto =
+    corpo.textoManual ?? (await montarTexto(supabase, corpo.chave, pedido, itens));
   if (!texto) return responder({ erro: "Modelo de mensagem não encontrado." }, 404);
 
-  const instancia = await instanciaAtiva(supabase);
-  const linkManual = montarLinkWhatsapp(pedido.whatsapp, texto);
+  const instancia = await instanciaAtiva(supabase, pedido.assinatura_id);
+  const linkManual = montarLinkWhatsapp(destino, texto);
 
   if (!instancia) {
     await registrar(supabase, {
       pedidoId: pedido.id,
-      destino: pedido.whatsapp,
+      destino,
       chave: corpo.chave,
       texto,
       temMidia: false,
@@ -106,29 +117,55 @@ Deno.serve(async (requisicao) => {
     return responder<Resultado>({ enviado: false, via: "link", link: linkManual, texto });
   }
 
-  const urlDaArte =
-    corpo.semArte || !pedido.arte_preview_path
-      ? null
-      : (
-          await supabase.storage
-            .from("artes")
-            .createSignedUrl(pedido.arte_preview_path, UMA_HORA)
-        ).data?.signedUrl ?? null;
+  // Uma imagem por item. O texto de resumo viaja com a primeira, e as demais
+  // vao so com a legenda do negocio: o cliente recebe uma conversa, nao um
+  // bloco de texto repetido.
+  const artes = corpo.semArte
+    ? []
+    : await Promise.all(
+        itens
+          .filter((item: { arte_preview_path: string | null }) => item.arte_preview_path)
+          .map(async (item: { nome_negocio: string; arte_preview_path: string }) => ({
+            legenda: item.nome_negocio,
+            url:
+              (
+                await supabase.storage
+                  .from("artes")
+                  .createSignedUrl(item.arte_preview_path, UMA_HORA)
+              ).data?.signedUrl ?? null,
+          })),
+      );
+
+  const comUrl = artes.filter((arte) => arte.url);
 
   const envio = await enviarPelaUazapi({
     host: instancia.host,
     token: instancia.token,
-    numero: pedido.whatsapp,
+    numero: destino,
     texto,
-    imagem: urlDaArte,
+    imagem: comUrl[0]?.url ?? null,
   });
+
+  // As artes seguintes so saem se a primeira mensagem passou: sem isso, uma
+  // instancia caida geraria uma fila de falhas identicas no log.
+  if (envio.ok) {
+    for (const arte of comUrl.slice(1)) {
+      await enviarPelaUazapi({
+        host: instancia.host,
+        token: instancia.token,
+        numero: destino,
+        texto: arte.legenda,
+        imagem: arte.url!,
+      });
+    }
+  }
 
   await registrar(supabase, {
     pedidoId: pedido.id,
-    destino: pedido.whatsapp,
+    destino,
     chave: corpo.chave,
     texto,
-    temMidia: Boolean(urlDaArte),
+    temMidia: comUrl.length > 0,
     via: "uazapi",
     sucesso: envio.ok,
     resposta: envio.resposta,
@@ -158,11 +195,12 @@ Deno.serve(async (requisicao) => {
 async function instanciaAtiva(
   // deno-lint-ignore no-explicit-any
   supabase: any,
+  assinaturaId: string,
 ): Promise<{ host: string; token: string } | null> {
   const { data: config } = await supabase
     .from("configuracoes")
     .select("instancia_id")
-    .eq("id", true)
+    .eq("assinatura_id", assinaturaId)
     .single();
 
   const consulta = supabase
@@ -247,8 +285,22 @@ async function enviarPelaUazapi({
   }
 }
 
-// deno-lint-ignore no-explicit-any
-async function montarTexto(supabase: any, chave: string, pedido: any): Promise<string | null> {
+/**
+ * Troca as chaves do modelo pelos dados do pedido.
+ *
+ * `{itens}` e a lista, uma linha por item. `{nome_negocio}` aponta para o
+ * primeiro item e cai no nome do cliente quando o pedido nao tem placa nenhuma,
+ * que e justamente o caso de um pedido so de produto padrao.
+ */
+async function montarTexto(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  chave: string,
+  // deno-lint-ignore no-explicit-any
+  pedido: any,
+  // deno-lint-ignore no-explicit-any
+  itens: any[],
+): Promise<string | null> {
   const { data: modelo } = await supabase
     .from("modelos_mensagem")
     .select("corpo")
@@ -258,20 +310,49 @@ async function montarTexto(supabase: any, chave: string, pedido: any): Promise<s
 
   if (!modelo) return null;
 
+  const primeiro = itens[0];
+
+  // Cor e tecnologia so existem em placa: num produto padrao as duas sao nulas,
+  // e a linha vira o nome do produto puro e simples.
+  const lista = itens
+    .map((item) => {
+      const configuracao = [
+        item.produto_nome,
+        item.cor ? (item.cor === "branco" ? "branco" : "preto") : null,
+        item.tecnologia ? (item.tecnologia === "qr_nfc" ? "QR e aproximação" : "só QR") : null,
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      const unidades = item.quantidade > 1 ? ` (${item.quantidade} un.)` : "";
+      const rotulo = item.nome_negocio ? `${item.nome_negocio}: ${configuracao}` : configuracao;
+
+      return `- ${rotulo}${unidades}, ${formatarMoeda(item.total_centavos)}`;
+    })
+    .join("\n");
+
   const valores: Record<string, string> = {
-    nome_negocio: pedido.nome_negocio,
+    cliente: pedido.clientes?.nome ?? "",
+    nome_negocio: primeiro?.nome_negocio ?? pedido.clientes?.nome ?? "",
     codigo: pedido.codigo,
-    tamanho: pedido.tamanho_codigo,
-    cor: pedido.cor === "branco" ? "branco" : "preto",
-    tecnologia: pedido.tecnologia === "qr_nfc" ? "QR code e aproximação" : "QR code",
-    quantidade: String(pedido.quantidade),
+    itens: lista,
+    produto: primeiro?.produto_nome ?? "",
+    cor: primeiro?.cor === "branco" ? "branco" : "preto",
+    tecnologia: primeiro?.tecnologia === "qr_nfc" ? "QR code e aproximação" : "QR code",
+    quantidade: String(itens.reduce((soma, item) => soma + item.quantidade, 0)),
     total: formatarMoeda(pedido.total_centavos),
+    prazo: prazoLegivel(pedido.prazo_entrega_dias),
   };
 
   return modelo.corpo.replace(
     /\{(\w+)\}/g,
     (original: string, chaveDoCampo: string) => valores[chaveDoCampo] ?? original,
   );
+}
+
+function prazoLegivel(dias: number | null): string {
+  if (!dias) return "combinar";
+  return dias === 1 ? "1 dia" : `${dias} dias`;
 }
 
 function formatarMoeda(centavos: number): string {

@@ -1,0 +1,66 @@
+import {
+  Building2,
+  LayoutDashboard,
+  ReceiptText,
+  Settings,
+  Store,
+  UserRoundCog,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+
+import type { PapelUsuario } from "@/types/database";
+
+export type ItemDeMenu = { href: string; rotulo: string; icone: LucideIcon };
+
+/**
+ * O menu de cada papel, numa lista so.
+ *
+ * A barra lateral do desktop e a barra inferior do celular leem daqui. Fossem
+ * duas listas, uma tela nova entraria em uma e sumiria na outra, e o bug so
+ * apareceria no aparelho de quem nao esta olhando.
+ *
+ * A ordem importa: no celular ela e a ordem dos botoes na barra de baixo, e o
+ * primeiro item e para onde o painel abre.
+ */
+const MENU: Record<PapelUsuario, ItemDeMenu[]> = {
+  admin: [
+    { href: "/admin", rotulo: "Dashboard", icone: LayoutDashboard },
+    { href: "/admin/assinantes", rotulo: "Assinantes", icone: Building2 },
+  ],
+  assinante: [
+    { href: "/vender", rotulo: "Vender", icone: Store },
+    { href: "/pedidos", rotulo: "Pedidos", icone: ReceiptText },
+    { href: "/clientes", rotulo: "Clientes", icone: Users },
+    { href: "/equipe", rotulo: "Equipe", icone: UserRoundCog },
+    { href: "/ajustes", rotulo: "Ajustes", icone: Settings },
+  ],
+  vendedor: [
+    { href: "/vender", rotulo: "Vender", icone: Store },
+    { href: "/pedidos", rotulo: "Pedidos", icone: ReceiptText },
+    { href: "/clientes", rotulo: "Clientes", icone: Users },
+  ],
+};
+
+export function itensDoPapel(papel: PapelUsuario): ItemDeMenu[] {
+  return MENU[papel];
+}
+
+/** Para onde cada papel vai quando entra ou quando cai numa rota que nao e dele. */
+export function inicioDoPapel(papel: PapelUsuario): string {
+  return MENU[papel][0].href;
+}
+
+/**
+ * O item ativo e o de caminho mais longo que casa com a rota.
+ *
+ * Sem isso `/admin` ficaria aceso junto com `/admin/assinantes`, porque um e
+ * prefixo do outro.
+ */
+export function itemAtivo(itens: ItemDeMenu[], caminho: string): string | null {
+  const candidatos = itens
+    .filter((item) => caminho === item.href || caminho.startsWith(`${item.href}/`))
+    .sort((a, b) => b.href.length - a.href.length);
+
+  return candidatos[0]?.href ?? null;
+}

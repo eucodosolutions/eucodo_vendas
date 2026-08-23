@@ -3,12 +3,17 @@
 import { useEffect, useRef } from "react";
 
 import { avisar } from "@/components/ui/avisos";
+import { esvaziarCarrinho } from "@/lib/carrinho/usar-carrinho";
 
 /**
- * Avisa o que aconteceu no pedido recem-criado.
+ * Avisa o que aconteceu no pedido recem-criado, e esvazia o carrinho.
  *
  * O redirect da criacao nao consegue disparar toast sozinho, entao quem faz e
  * este componente ao montar. Nao desenha nada na tela.
+ *
+ * O carrinho e limpo aqui, e nao no botao de fechar pedido, porque este e o
+ * unico ponto em que o pedido comprovadamente existe: limpar antes significaria
+ * perder o carrinho montado se a gravacao falhasse.
  */
 export function AvisoDeChegada({ envio }: { envio?: string }) {
   const jaAvisou = useRef(false);
@@ -17,12 +22,14 @@ export function AvisoDeChegada({ envio }: { envio?: string }) {
     if (jaAvisou.current) return;
     jaAvisou.current = true;
 
+    esvaziarCarrinho();
+
     if (envio === "link") {
       avisar.atencao(
-        "Pedido criado e arte gerada. Sem instância conectada, use Mandar a arte no WhatsApp.",
+        "Pedido criado e artes geradas. Sem instância conectada, use Mandar as artes no WhatsApp.",
       );
     } else {
-      avisar.sucesso("Pedido criado, arte gerada e mensagem enviada para o cliente.");
+      avisar.sucesso("Pedido criado, artes geradas e mensagem enviada para o cliente.");
     }
   }, [envio]);
 

@@ -1,5 +1,5 @@
-import { ROTULO_STATUS } from "@/lib/formato";
-import type { StatusPagamento, StatusPedido } from "@/types/database";
+import { ROTULO_STATUS, ROTULO_STATUS_ASSINATURA } from "@/lib/formato";
+import type { StatusAssinatura, StatusPagamento, StatusPedido } from "@/types/database";
 
 const BASE =
   "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap";
@@ -25,6 +25,27 @@ export function EtiquetaPagamento({ pagamento }: { pagamento: StatusPagamento })
   return (
     <span className={`${BASE} ${pago ? "bg-sucesso-suave text-sucesso" : "bg-papel text-tinta-media"}`}>
       {pago ? "Pago" : "A receber"}
+    </span>
+  );
+}
+
+/**
+ * Estado da assinatura, no painel da plataforma.
+ *
+ * O rotulo vem junto da cor de proposito: quem nao distingue verde de laranja
+ * ainda le "Pendente".
+ */
+const CORES_ASSINATURA: Record<StatusAssinatura, string> = {
+  pendente: "bg-atencao-suave text-atencao",
+  ativa: "bg-sucesso-suave text-sucesso",
+  suspensa: "bg-erro-suave text-erro",
+  cancelada: "bg-papel text-tinta-media",
+};
+
+export function EtiquetaAssinatura({ status }: { status: StatusAssinatura }) {
+  return (
+    <span className={`${BASE} ${CORES_ASSINATURA[status]}`}>
+      {ROTULO_STATUS_ASSINATURA[status]}
     </span>
   );
 }

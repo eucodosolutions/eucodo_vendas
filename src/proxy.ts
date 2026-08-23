@@ -7,6 +7,11 @@ export async function proxy(request: NextRequest) {
   return atualizarSessao(request);
 }
 
+// sw.js e manifest.webmanifest ficam de fora: sao arquivos do PWA, buscados
+// pelo navegador sem sessao. Passando pelo proxy, os dois virariam redirect
+// para /entrar e a instalacao do app nunca seria oferecida.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };
