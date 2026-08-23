@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { normalizarWhatsapp, validarLinkAvaliacao } from "@/lib/formato";
+import { normalizarWhatsapp } from "@/lib/formato";
 import { sessaoDoPainel } from "@/lib/supabase/painel";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,9 +18,6 @@ const esquema = z.object({
   id: z.string().uuid().optional(),
   nome: z.string().trim().min(2, "Digite o nome do cliente."),
   whatsapp: z.string().trim().min(1, "Digite o WhatsApp do cliente."),
-  linkAvaliacao: z.string().trim().optional(),
-  /** Vem junto quando o negocio foi achado na busca; colado a mao nao tem. */
-  placeId: z.string().trim().optional(),
   observacoes: z.string().trim().max(500).optional(),
 });
 
@@ -41,8 +38,6 @@ export async function salvarCliente(
     id: dados.get("id") || undefined,
     nome: dados.get("nome"),
     whatsapp: dados.get("whatsapp"),
-    linkAvaliacao: dados.get("linkAvaliacao") || undefined,
-    placeId: dados.get("placeId") || undefined,
     observacoes: dados.get("observacoes") || undefined,
   });
 
@@ -71,26 +66,17 @@ async function gravar(dados: DadosDoCliente): Promise<EstadoCliente> {
     return { erro: "Esse WhatsApp não parece válido. Confira o DDD e o número." };
   }
 
-  let link: string | null = null;
-  if (dados.linkAvaliacao) {
-    link = validarLinkAvaliacao(dados.linkAvaliacao);
-    if (!link) {
-      return { erro: "Esse link não abre a caixa de avaliação. Busque o negócio no Google." };
-    }
-  }
-
   const sessao = await sessaoDoPainel();
   if (!sessao?.perfil.assinatura_id) return { erro: "Sessão expirada. Entre de novo." };
 
   const supabase = await createClient();
 
+  // `link_avaliacao` e `google_place_id` ficaram de fora de proposito. Nao e so
+  // que o cadastro nao os pede mais: listar aqui como null apagaria, em toda
+  // edicao de cliente, o que ficou gravado antes de o link virar coisa do item.
   const campos = {
     nome: dados.nome,
     whatsapp,
-    link_avaliacao: link,
-    // Sem link nao existe place id: os dois nascem da mesma escolha, e guardar
-    // um id orfao so daria a ilusao de que o negocio esta resolvido.
-    google_place_id: link ? dados.placeId || null : null,
     observacoes: dados.observacoes || null,
   };
 
