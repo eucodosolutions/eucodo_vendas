@@ -1,8 +1,9 @@
 "use client";
 
-import { Check, Link2, Loader2, MapPin, Search, X } from "lucide-react";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Check, ExternalLink, Link2, MapPin, Search, X } from "lucide-react";
+import { useId, useState, type ReactNode } from "react";
 
+import { Botao } from "./botao";
 import { ALTURA_CONTROLE, BORDA_ERRO, BORDA_NORMAL, juntar, MOLDURA_CONTROLE } from "./controle";
 import { validarLinkAvaliacao } from "@/lib/formato";
 import { buscarNegocio, type NegocioEncontrado } from "@/lib/places/buscar";
@@ -15,9 +16,6 @@ export type NegocioEscolhido = {
   placeId?: string;
 };
 
-// Tempo entre a ultima tecla e a chamada. Cada busca e uma chamada paga: 450ms
-// e o que separa "digitou o nome" de "digitou cada letra".
-const ESPERA_ENTRE_TECLAS = 450;
 const MINIMO_DE_BUSCA = 3;
 
 /**
@@ -25,12 +23,17 @@ const MINIMO_DE_BUSCA = 3;
  *
  * O caminho normal e buscar o negocio no Google, porque o link que abre a caixa
  * de avaliacao so existe dentro do painel de quem gerencia o perfil — de fora,
- * quem sabe montar ele e a Places API. Colar o encurtado do Maps parece dar
- * certo e nao da: vira um QR que abre a ficha do negocio, onde ninguem avalia.
+ * quem sabe monta-lo e a Places API. Colar o encurtado do Maps parece dar certo
+ * e nao da: vira um QR que abre a ficha do negocio, onde ninguem avalia.
+ *
+ * A busca so acontece no clique, e nunca enquanto se digita. Cada chamada e
+ * paga, e busca por tecla cobra o caminho inteiro do nome — "B", "Ba", "Bar" —
+ * para entregar so a ultima. O nome tambem costuma vir errado da memoria de
+ * quem vende, entao o botao de abrir o Google esta ali para o nome exato ser
+ * copiado de la e colado aqui: uma chamada, com o termo certo.
  *
  * O campo de colar continua existindo, atras de um clique, para quem chega com
- * o g.page do proprio perfil na mao. So que agora ele confere o formato, em vez
- * de aceitar qualquer endereco do Google.
+ * o g.page do proprio perfil na mao.
  */
 export function BuscaDeNegocio({
   escolhido,
@@ -43,55 +46,42 @@ export function BuscaDeNegocio({
   const [resultados, setResultados] = useState<NegocioEncontrado[]>([]);
   const [buscando, setBuscando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [jaBuscou, setJaBuscou] = useState(false);
   const [manual, setManual] = useState(false);
 
   const rotuloId = useId();
+  const curto = termo.trim().length < MINIMO_DE_BUSCA;
 
-  // Resposta lenta de uma busca antiga nao pode sobrescrever a nova: so a
-  // ultima chamada disparada tem direito de escrever na lista.
-  const chamadaAtual = useRef(0);
+  async function pesquisar() {
+    const procurado = termo.trim();
+    if (procurado.length < MINIMO_DE_BUSCA || buscando) return;
 
-  // Apagar a lista e assunto de quem digitou, e nao do efeito: e no momento da
-  // tecla que se sabe que o termo encolheu. Lista velha embaixo de termo novo e
-  // o convite para escolher o negocio errado.
-  function digitar(valor: string) {
-    setTermo(valor);
+    setBuscando(true);
+    setErro(null);
 
-    if (valor.trim().length < MINIMO_DE_BUSCA) {
-      chamadaAtual.current++;
-      setResultados([]);
-      setErro(null);
-      setBuscando(false);
-    } else {
-      setBuscando(true);
-    }
+    const resposta = await buscarNegocio(procurado);
+
+    setResultados(resposta.negocios);
+    setErro(resposta.erro ?? null);
+    setJaBuscou(true);
+    setBuscando(false);
   }
 
-  useEffect(() => {
-    if (manual || escolhido) return;
-
-    const procurado = termo.trim();
-    if (procurado.length < MINIMO_DE_BUSCA) return;
-
-    const chamada = ++chamadaAtual.current;
-
-    const agendada = setTimeout(async () => {
-      const resposta = await buscarNegocio(procurado);
-      if (chamada !== chamadaAtual.current) return;
-
-      setResultados(resposta.negocios);
-      setErro(resposta.erro ?? null);
-      setBuscando(false);
-    }, ESPERA_ENTRE_TECLAS);
-
-    return () => clearTimeout(agendada);
-  }, [termo, manual, escolhido]);
+  // Mudou o termo, a lista de antes nao vale mais: resultado velho embaixo de
+  // texto novo e o convite para escolher o negocio errado.
+  function digitar(valor: string) {
+    setTermo(valor);
+    setResultados([]);
+    setErro(null);
+    setJaBuscou(false);
+  }
 
   function limpar() {
     aoEscolher(null);
     setTermo("");
     setResultados([]);
     setErro(null);
+    setJaBuscou(false);
   }
 
   if (escolhido) {
@@ -129,37 +119,48 @@ export function BuscaDeNegocio({
     );
   }
 
-  const buscaCompleta = termo.trim().length >= MINIMO_DE_BUSCA;
-
   return (
     <Moldura rotuloId={rotuloId}>
-      <div className="relative">
-        <Search
-          size={16}
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-tinta-suave"
-        />
-        <input
-          type="text"
-          aria-labelledby={rotuloId}
-          autoComplete="off"
-          placeholder="Barbearia Vintage, Fortaleza"
-          value={termo}
-          onChange={(evento) => digitar(evento.target.value)}
-          className={juntar(
-            ALTURA_CONTROLE,
-            MOLDURA_CONTROLE,
-            BORDA_NORMAL,
-            "pr-10 pl-9 placeholder:text-tinta-suave/70",
-          )}
-        />
-        {buscando ? (
-          <Loader2
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search
             size={16}
             aria-hidden
-            className="absolute top-1/2 right-3 -translate-y-1/2 animate-spin text-tinta-suave"
+            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-tinta-suave"
           />
-        ) : null}
+          <input
+            type="text"
+            aria-labelledby={rotuloId}
+            autoComplete="off"
+            placeholder="Cole aqui o nome exato do negócio"
+            value={termo}
+            onChange={(evento) => digitar(evento.target.value)}
+            // Enter dentro de um popup que tem botao de salvar submeteria o
+            // popup inteiro. Aqui ele pesquisa, que e o que se espera de um
+            // campo de busca.
+            onKeyDown={(evento) => {
+              if (evento.key !== "Enter") return;
+              evento.preventDefault();
+              void pesquisar();
+            }}
+            className={juntar(
+              ALTURA_CONTROLE,
+              MOLDURA_CONTROLE,
+              BORDA_NORMAL,
+              "pr-3 pl-9 placeholder:text-tinta-suave/70",
+            )}
+          />
+        </div>
+
+        <Botao
+          type="button"
+          variante="secundario"
+          onClick={() => void pesquisar()}
+          disabled={curto || buscando}
+          carregandoTexto="Buscando..."
+        >
+          {buscando ? "Buscando..." : "Pesquisar"}
+        </Botao>
       </div>
 
       {resultados.length > 0 ? (
@@ -190,18 +191,36 @@ export function BuscaDeNegocio({
 
       {erro ? <p className="text-xs font-medium text-erro">{erro}</p> : null}
 
-      {!erro && !buscando && buscaCompleta && resultados.length === 0 ? (
-        <p className="text-xs text-tinta-suave">Nada com esse nome. Tente incluir a cidade.</p>
+      {!erro && jaBuscou && resultados.length === 0 ? (
+        <p className="text-xs text-tinta-suave">
+          Nada com esse nome. Abra o Google e copie o nome como está escrito lá.
+        </p>
       ) : null}
 
-      <button
-        type="button"
-        onClick={() => setManual(true)}
-        className="flex items-center gap-1.5 self-start text-xs font-medium text-marca transition-colors hover:text-marca-escura"
-      >
-        <Link2 size={13} aria-hidden />
-        Já tenho o link do perfil
-      </button>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <a
+          href={
+            curto
+              ? "https://www.google.com/maps"
+              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(termo.trim())}`
+          }
+          target="_blank"
+          rel="noreferrer noopener"
+          className="flex items-center gap-1.5 text-xs font-medium text-marca transition-colors hover:text-marca-escura"
+        >
+          <ExternalLink size={13} aria-hidden />
+          Abrir o Google para achar o nome
+        </a>
+
+        <button
+          type="button"
+          onClick={() => setManual(true)}
+          className="flex items-center gap-1.5 text-xs font-medium text-marca transition-colors hover:text-marca-escura"
+        >
+          <Link2 size={13} aria-hidden />
+          Já tenho o link do perfil
+        </button>
+      </div>
     </Moldura>
   );
 }
@@ -260,6 +279,11 @@ function ColarLink({
         }}
         onBlur={() => {
           if (texto.trim()) confirmar();
+        }}
+        onKeyDown={(evento) => {
+          if (evento.key !== "Enter") return;
+          evento.preventDefault();
+          confirmar();
         }}
         aria-invalid={erro ? true : undefined}
         className={juntar(
