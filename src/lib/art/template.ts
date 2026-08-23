@@ -131,10 +131,19 @@ type BuildOptions = {
   cornerRadius?: number;
   /** Desenha a margem de seguranca por cima, para conferencia visual. */
   showSafeArea?: boolean;
+  /**
+   * Familia da fonte do desenho.
+   *
+   * O padrao e a pilha por nome, que e o que o rasterizador entende. A previa
+   * que vai inline no HTML passa "inherit": assim ela usa a Poppins que a
+   * pagina ja carregou, em vez de cair na fonte do sistema e sair com um
+   * desenho diferente do que vai ser impresso.
+   */
+  fontFamily?: string;
 };
 
 export function buildDisplaySvg(input: ArtInput, options: BuildOptions = {}): string {
-  const { cornerRadius = 0, showSafeArea = false } = options;
+  const { cornerRadius = 0, showSafeArea = false, fontFamily = FONT_STACK } = options;
   const layout = layoutFor(input.spec);
   const theme = THEMES[input.color];
   const { width, height, bleed } = layout;
@@ -157,7 +166,7 @@ export function buildDisplaySvg(input: ArtInput, options: BuildOptions = {}): st
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-bleed} ${-bleed} ${round(width + bleed * 2)} ${round(height + bleed * 2)}" width="${round(width + bleed * 2)}" height="${round(height + bleed * 2)}">`,
     defs(),
-    `<g font-family="${FONT_STACK}">`,
+    `<g font-family="${fontFamily}">`,
     parts.join(""),
     "</g>",
     "</svg>",

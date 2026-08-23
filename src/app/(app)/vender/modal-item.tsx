@@ -23,11 +23,14 @@ import type { CorArte } from "@/types/database";
  */
 export function ModalItem({
   produto,
+  cor,
   aoFechar,
   aoAdicionar,
 }: {
   /** Nulo com o popup fechado: e o proprio produto que abre a tela. */
   produto: ProdutoDaVenda | null;
+  /** A cor que estava na vitrine quando o produto foi tocado. */
+  cor: CorArte | null;
   aoFechar: () => void;
   aoAdicionar: (item: Omit<ItemDoCarrinho, "chave">) => void;
 }) {
@@ -40,6 +43,7 @@ export function ModalItem({
     <Formulario
       key={produto.id}
       produto={produto}
+      corInicial={cor}
       aoFechar={aoFechar}
       aoAdicionar={aoAdicionar}
     />
@@ -48,16 +52,18 @@ export function ModalItem({
 
 function Formulario({
   produto,
+  corInicial,
   aoFechar,
   aoAdicionar,
 }: {
   produto: ProdutoDaVenda;
+  corInicial: CorArte | null;
   aoFechar: () => void;
   aoAdicionar: (item: Omit<ItemDoCarrinho, "chave">) => void;
 }) {
   const placa = produto.produto_avaliacao;
 
-  const [cor, setCor] = useState<CorArte | null>(placa?.cores[0] ?? null);
+  const [cor, setCor] = useState<CorArte | null>(corInicial ?? placa?.cores[0] ?? null);
   const [quantidade, setQuantidade] = useState(1);
   const [nomeNegocio, setNomeNegocio] = useState("");
   const [linkAvaliacao, setLinkAvaliacao] = useState("");

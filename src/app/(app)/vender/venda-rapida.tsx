@@ -10,6 +10,7 @@ import { GavetaDoCarrinho } from "./gaveta-do-carrinho";
 import { ModalFechamento } from "./modal-fechamento";
 import { ModalItem } from "./modal-item";
 import { avisar, useAviso } from "@/components/ui/avisos";
+import type { PreviaDaArte } from "@/lib/art/vitrine";
 import { useCarrinho } from "@/lib/carrinho/usar-carrinho";
 import { pecasDoCarrinho, totalDoCarrinho } from "@/lib/carrinho/carrinho";
 import { moeda } from "@/lib/formato";
@@ -26,9 +27,14 @@ export type ProdutoDaVenda = {
   produto_avaliacao: {
     largura_mm: number;
     altura_mm: number;
+    margem_seguranca_mm: number;
+    sangria_mm: number;
+    dpi: number;
     cores: CorArte[];
     tecnologia: TecnologiaArte;
   } | null;
+  /** A peca desenhada, uma por cor. Vazia no produto que nao e placa. */
+  previas: PreviaDaArte[];
 };
 
 /**
@@ -53,7 +59,12 @@ export function VendaRapida({
 
   const carrinho = useCarrinho();
 
-  const [produtoAberto, setProdutoAberto] = useState<ProdutoDaVenda | null>(null);
+  // O popup abre com o produto e com a cor que estava na vitrine: quem virou a
+  // tela para o cliente escolher a arte nao deveria ter que escolher de novo.
+  const [itemAberto, setItemAberto] = useState<{
+    produto: ProdutoDaVenda;
+    cor: CorArte | null;
+  } | null>(null);
   const [gavetaAberta, setGavetaAberta] = useState(false);
   const [fechamentoAberto, setFechamentoAberto] = useState(false);
 
@@ -81,7 +92,7 @@ export function VendaRapida({
           <CartaoDeProduto
             key={produto.id}
             produto={produto}
-            aoAdicionar={() => setProdutoAberto(produto)}
+            aoAdicionar={(cor) => setItemAberto({ produto, cor })}
           />
         ))}
       </div>
@@ -111,8 +122,9 @@ export function VendaRapida({
       ) : null}
 
       <ModalItem
-        produto={produtoAberto}
-        aoFechar={() => setProdutoAberto(null)}
+        produto={itemAberto?.produto ?? null}
+        cor={itemAberto?.cor ?? null}
+        aoFechar={() => setItemAberto(null)}
         aoAdicionar={adicionar}
       />
 

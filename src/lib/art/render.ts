@@ -2,6 +2,7 @@ import path from "node:path";
 import { Resvg } from "@resvg/resvg-js";
 import sharp from "sharp";
 import { buildDisplaySvg } from "./template";
+import { cantoDaPrevia } from "./vitrine";
 import { pixelSize, type ArtInput } from "./types";
 
 const FONT_DIR = path.join(process.cwd(), "assets", "fonts");
@@ -42,8 +43,7 @@ export async function renderPreviewPng(
   width = 900,
   options: { showSafeArea?: boolean } = {},
 ): Promise<Buffer> {
-  // Canto de aproximadamente 4 mm, so para a previa parecer o display real.
-  const cornerRadius = input.spec.widthMm * 0.04 * 10;
+  const cornerRadius = cantoDaPrevia(input.spec);
   const svg = buildDisplaySvg(input, { cornerRadius, ...options });
   return sharp(rasterize(svg, width)).png({ compressionLevel: 9 }).toBuffer();
 }
