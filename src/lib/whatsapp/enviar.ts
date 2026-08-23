@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 
 export type ChaveMensagem =
   | "pedido_criado"
+  /** O mesmo fechamento, com o PIX copia e cola no fim. */
+  | "pedido_criado_pix"
   | "status_em_producao"
   | "status_pronto"
   | "status_entregue"

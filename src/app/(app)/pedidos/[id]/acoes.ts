@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { renderPreviewPng, renderPrintJpg } from "@/lib/art/render";
 import { specDoProduto } from "@/lib/art/spec";
+import { detalheDaPlaca } from "@/lib/catalogo";
 import { createClient } from "@/lib/supabase/server";
 import { enviarWhatsapp, type ChaveMensagem } from "@/lib/whatsapp/enviar";
 import type { FormaPagamento, PedidoItem, StatusPedido } from "@/types/database";
@@ -276,7 +277,7 @@ export async function regerarArte(_estado: EstadoAcao, dados: FormData): Promise
   const { data: produtos } = await supabase
     .from("produtos")
     .select(
-      "id, nome, produto_avaliacao (largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi)",
+      `id, nome, ${detalheDaPlaca("largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi")}`,
     )
     .in("id", ids)
     .returns<ProdutoParaArte[]>();

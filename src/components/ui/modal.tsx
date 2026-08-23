@@ -1,44 +1,16 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 import { juntar } from "./controle";
+import { useSobreposicao } from "./sobreposicao";
 
 const LARGURAS = {
   estreito: "sm:max-w-md",
   medio: "sm:max-w-xl",
   largo: "sm:max-w-3xl",
 } as const;
-
-/** O que o navegador aceita focar por tabulacao dentro do popup. */
-const FOCAVEIS =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-let popupsAbertos = 0;
-let rolagemOriginal = "";
-
-/**
- * Trava a rolagem do fundo enquanto houver popup aberto.
- *
- * A conta e de modulo, e nao de componente, porque os popups se empilham: a
- * confirmacao de remover produto abre por cima do cadastro dele. Com uma trava
- * por componente, os dois desmontam no mesmo passo, o ultimo a limpar devolve o
- * `hidden` que o primeiro tinha guardado, e a pagina fica sem rolar ate o F5.
- */
-function travarRolagem(): () => void {
-  if (popupsAbertos === 0) {
-    rolagemOriginal = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-  }
-
-  popupsAbertos += 1;
-
-  return () => {
-    popupsAbertos -= 1;
-    if (popupsAbertos === 0) document.body.style.overflow = rolagemOriginal;
-  };
-}
 
 type ModalProps = {
   aberto: boolean;
@@ -55,10 +27,10 @@ type ModalProps = {
  * Popup padrao do sistema. Todo cadastro e toda edicao passam por aqui.
  *
  * Nao e o `<dialog>` nativo, e a escolha custou uma armadilha de foco escrita a
- * mao. O `showModal()` joga o elemento na top layer do navegador, que fica
- * acima de tudo que nao esteja nela: o toast do sonner sumiria atras do popup
- * justamente nas telas onde o formulario avisa que algo deu errado. Como neste
- * projeto todo aviso e toast, quem cede e o popup.
+ * mao, hoje no `useSobreposicao`. O `showModal()` joga o elemento na top layer
+ * do navegador, que fica acima de tudo que nao esteja nela: o toast do sonner
+ * sumiria atras do popup justamente nas telas onde o formulario avisa que algo
+ * deu errado. Como neste projeto todo aviso e toast, quem cede e o popup.
  *
  * No celular ele cola no rodape e ocupa quase a tela toda, pela mesma razao da
  * barra de navegacao ficar embaixo: o painel e usado com uma mao so, no meio de
@@ -73,56 +45,8 @@ export function Modal({
   rodape,
   tamanho = "medio",
 }: ModalProps) {
-  const caixa = useRef<HTMLDivElement>(null);
-  const focoAnterior = useRef<HTMLElement | null>(null);
+  const { caixa, aoTeclar } = useSobreposicao(aberto, aoFechar);
   const idDoTitulo = useId();
-
-  // Guarda de onde a pessoa veio e devolve o foco ao fechar. Sem isto, quem
-  // abriu o popup pelo teclado volta para o comeco da pagina.
-  useEffect(() => {
-    if (!aberto) return;
-
-    focoAnterior.current = document.activeElement as HTMLElement | null;
-    const primeiro = caixa.current?.querySelector<HTMLElement>(FOCAVEIS);
-    (primeiro ?? caixa.current)?.focus();
-
-    return () => focoAnterior.current?.focus();
-  }, [aberto]);
-
-  useEffect(() => {
-    if (!aberto) return;
-    return travarRolagem();
-  }, [aberto]);
-
-  const aoTeclar = useCallback(
-    (evento: KeyboardEvent<HTMLDivElement>) => {
-      if (evento.key === "Escape") {
-        evento.stopPropagation();
-        aoFechar();
-        return;
-      }
-
-      if (evento.key !== "Tab") return;
-
-      const alvos = Array.from(caixa.current?.querySelectorAll<HTMLElement>(FOCAVEIS) ?? []);
-      if (alvos.length === 0) return;
-
-      const primeiro = alvos[0];
-      const ultimo = alvos[alvos.length - 1];
-      const atual = document.activeElement;
-
-      // Tab no ultimo volta para o primeiro, e Shift+Tab no primeiro vai para o
-      // ultimo: e isso que impede o foco de escapar para a pagina atras.
-      if (!evento.shiftKey && atual === ultimo) {
-        evento.preventDefault();
-        primeiro.focus();
-      } else if (evento.shiftKey && atual === primeiro) {
-        evento.preventDefault();
-        ultimo.focus();
-      }
-    },
-    [aoFechar],
-  );
 
   if (!aberto) return null;
 

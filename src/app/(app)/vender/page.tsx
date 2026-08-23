@@ -4,6 +4,7 @@ import type { ClienteDaLista } from "./escolher-cliente";
 import { VendaRapida, type ProdutoDaVenda } from "./venda-rapida";
 import { LinkBotao } from "@/components/ui/link-botao";
 import { Secao } from "@/components/ui/secao";
+import { detalheDaPlaca } from "@/lib/catalogo";
 import { sessaoDoPainel } from "@/lib/supabase/painel";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,11 +16,11 @@ export default async function PaginaVender() {
   const supabase = await createClient();
   const sessao = await sessaoDoPainel();
 
-  const [{ data: catalogo }, { data: clientes }] = await Promise.all([
+  const [{ data: catalogo }, { data: clientes }, { data: pix }] = await Promise.all([
     supabase
       .from("produtos")
       .select(
-        "id, tipo, nome, descricao, foto_path, preco_centavos, prazo_entrega_dias, produto_avaliacao (largura_mm, altura_mm, cores, tecnologia)",
+        `id, tipo, nome, descricao, foto_path, preco_centavos, prazo_entrega_dias, ${detalheDaPlaca("largura_mm, altura_mm, cores, tecnologia")}`,
       )
       .eq("ativo", true)
       .order("ordem")
@@ -33,6 +34,11 @@ export default async function PaginaVender() {
       .order("nome")
       .limit(300)
       .returns<ClienteDaLista[]>(),
+    // So a existencia da chave interessa aqui: e ela que decide se o fechamento
+    // pode prometer o PIX copia e cola. Vai pela funcao, e nao pela tabela,
+    // porque `configuracoes` so abre para o assinante e esta tela e do vendedor
+    // tambem. O codigo em si e montado no servidor, no fechamento.
+    supabase.rpc("pix_da_conta").maybeSingle(),
   ]);
 
   // Placa sem medida nao gera arte: fica fora da venda ate o dono completar o
@@ -66,5 +72,11 @@ export default async function PaginaVender() {
     );
   }
 
-  return <VendaRapida produtos={produtos} clientes={clientes ?? []} />;
+  return (
+    <VendaRapida
+      produtos={produtos}
+      clientes={clientes ?? []}
+      pixConfigurado={Boolean(pix?.pix_chave)}
+    />
+  );
 }

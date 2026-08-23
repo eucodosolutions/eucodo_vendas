@@ -86,3 +86,18 @@ export function tamanhoDasMedidas(largura: number, altura: number): TamanhoDePla
 
   return encontrado ?? "personalizado";
 }
+
+/**
+ * O detalhe da placa dentro de um select de `produtos`.
+ *
+ * `produto_avaliacao` aponta duas vezes para `produtos`: pela chave do produto
+ * e pela chave composta com a conta, que existe para o detalhe nao poder cair
+ * em produto de outra assinatura. Com as duas no lugar, o PostgREST nao sabe
+ * por qual embutir e responde erro em vez de linha — foi o que sumiu com o
+ * catalogo inteiro das telas de Produtos e Vender. Nomear a chave desfaz o
+ * empate, e a do produto e a que da o um-para-um: o detalhe volta como objeto,
+ * e nao como lista de um.
+ */
+export function detalheDaPlaca(campos: string): string {
+  return `produto_avaliacao!produto_avaliacao_produto_id_fkey (${campos})`;
+}
