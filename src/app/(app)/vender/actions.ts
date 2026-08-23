@@ -25,6 +25,8 @@ export type ItemParaPedido = {
   produtoId: string;
   quantidade: number;
   cor?: CorArte;
+  /** O cadastro de onde a placa saiu, criado quando o item entrou no carrinho. */
+  negocioId?: string;
   nomeNegocio?: string;
   linkAvaliacao?: string;
   placeId?: string;
@@ -52,6 +54,7 @@ const esquema = z.object({
         produtoId: z.string().uuid(),
         quantidade: z.coerce.number().int().min(1).max(999),
         cor: z.enum(CORES).optional(),
+        negocioId: z.string().uuid().optional(),
         nomeNegocio: z.string().trim().min(2).optional(),
         linkAvaliacao: z.string().trim().min(1).optional(),
         placeId: z.string().trim().optional(),
@@ -162,6 +165,23 @@ export async function criarPedido(
 
   if (!cliente) return { erro: "Esse cliente não está mais na sua lista." };
 
+  // O `negocio_id` chega do navegador e a chave estrangeira sozinha nao confere
+  // conta nenhuma: ela aceitaria o id de um negocio de outro assinante. Esta
+  // consulta passa pela RLS, entao o que nao voltar aqui e o que esta pessoa
+  // nao pode ver — e vira nulo, sem derrubar a venda. O que foi impresso nao
+  // depende disto: nome e link vao carimbados no proprio item.
+  const idsDeNegocio = itens.map((item) => item.negocioId).filter(Boolean) as string[];
+  const negociosValidos = new Set<string>();
+
+  if (idsDeNegocio.length > 0) {
+    const { data: agenda } = await supabase
+      .from("negocios")
+      .select("id")
+      .in("id", idsDeNegocio);
+
+    for (const linha of agenda ?? []) negociosValidos.add(linha.id);
+  }
+
   const { data: pedido, error: erroPedido } = await supabase
     .from("pedidos")
     .insert({
@@ -192,6 +212,8 @@ export async function criarPedido(
       nome_negocio: ehPlaca ? item.nomeNegocio! : null,
       link_avaliacao: links[indice],
       google_place_id: ehPlaca ? item.placeId || null : null,
+      negocio_id:
+        ehPlaca && item.negocioId && negociosValidos.has(item.negocioId) ? item.negocioId : null,
       produto_nome: produto.nome,
       cor: ehPlaca ? item.cor! : null,
       // A tecnologia vem do produto, e nao do carrinho: e o produto que decide,

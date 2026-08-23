@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useActionState } from "react";
+import { useEffect, useMemo, useState, useActionState } from "react";
 
 import { criarPedido, type EstadoVenda, type PedidoDoCarrinho } from "./actions";
 import { BotaoDoCarrinho } from "./botao-do-carrinho";
@@ -10,6 +10,7 @@ import { GavetaDoCarrinho } from "./gaveta-do-carrinho";
 import { ModalFechamento } from "./modal-fechamento";
 import { ModalItem } from "./modal-item";
 import { avisar, useAviso } from "@/components/ui/avisos";
+import type { NegocioCadastrado } from "@/components/ui/busca-de-negocio";
 import type { PreviaDaArte } from "@/lib/art/vitrine";
 import { fecharCarrinho, useCarrinhoAberto } from "@/lib/carrinho/gaveta";
 import { useCarrinho } from "@/lib/carrinho/usar-carrinho";
@@ -47,10 +48,12 @@ export type ProdutoDaVenda = {
 export function VendaRapida({
   produtos,
   clientes,
+  negocios,
   pixConfigurado,
 }: {
   produtos: ProdutoDaVenda[];
   clientes: ClienteDaLista[];
+  negocios: NegocioCadastrado[];
   pixConfigurado: boolean;
 }) {
   const [estado, fechar, fechando] = useActionState<EstadoVenda, PedidoDoCarrinho>(criarPedido, {});
@@ -65,6 +68,12 @@ export function VendaRapida({
     cor: CorArte | null;
   } | null>(null);
   const [fechamentoAberto, setFechamentoAberto] = useState(false);
+
+  // O negocio cadastrado no popup do item nao existe na lista que veio do
+  // servidor ate a proxima visita a esta tela. Sem isto, a segunda placa do
+  // mesmo negocio, no mesmo carrinho, nao o encontraria em "Meus negocios".
+  const [novosNegocios, setNovosNegocios] = useState<NegocioCadastrado[]>([]);
+  const agenda = useMemo(() => [...novosNegocios, ...negocios], [novosNegocios, negocios]);
 
   // A gaveta e aberta de dois lugares: o botao do cabecalho, no computador, e o
   // botao redondo da barra de baixo, no celular, que vive fora desta tela. Por
@@ -107,8 +116,12 @@ export function VendaRapida({
       <ModalItem
         produto={itemAberto?.produto ?? null}
         cor={itemAberto?.cor ?? null}
+        negocios={agenda}
         aoFechar={() => setItemAberto(null)}
         aoAdicionar={adicionar}
+        aoCadastrarNegocio={(negocio) =>
+          setNovosNegocios((atuais) => [negocio, ...atuais])
+        }
       />
 
       <GavetaDoCarrinho
@@ -139,6 +152,7 @@ export function VendaRapida({
               produtoId: item.produtoId,
               quantidade: item.quantidade,
               cor: item.cor,
+              negocioId: item.negocioId,
               nomeNegocio: item.nomeNegocio,
               linkAvaliacao: item.linkAvaliacao,
               placeId: item.placeId,

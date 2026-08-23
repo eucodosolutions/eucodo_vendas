@@ -71,9 +71,6 @@ async function gravar(dados: DadosDoCliente): Promise<EstadoCliente> {
 
   const supabase = await createClient();
 
-  // `link_avaliacao` e `google_place_id` ficaram de fora de proposito. Nao e so
-  // que o cadastro nao os pede mais: listar aqui como null apagaria, em toda
-  // edicao de cliente, o que ficou gravado antes de o link virar coisa do item.
   const campos = {
     nome: dados.nome,
     whatsapp,

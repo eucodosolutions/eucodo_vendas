@@ -1,12 +1,17 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
 
 import { Quantidade } from "./quantidade";
 import type { ProdutoDaVenda } from "./venda-rapida";
+import { garantirNegocio } from "../negocios/actions";
 import { avisar } from "@/components/ui/avisos";
 import { Botao } from "@/components/ui/botao";
-import { BuscaDeNegocio, type NegocioEscolhido } from "@/components/ui/busca-de-negocio";
+import {
+  BuscaDeNegocio,
+  type NegocioCadastrado,
+  type NegocioEscolhido,
+} from "@/components/ui/busca-de-negocio";
 import { Campo } from "@/components/ui/campo";
 import { Escolha } from "@/components/ui/escolha";
 import { Modal } from "@/components/ui/modal";
@@ -25,15 +30,21 @@ import type { CorArte } from "@/types/database";
 export function ModalItem({
   produto,
   cor,
+  negocios,
   aoFechar,
   aoAdicionar,
+  aoCadastrarNegocio,
 }: {
   /** Nulo com o popup fechado: e o proprio produto que abre a tela. */
   produto: ProdutoDaVenda | null;
   /** A cor que estava na vitrine quando o produto foi tocado. */
   cor: CorArte | null;
+  /** A agenda de negocios de quem esta vendendo. */
+  negocios: NegocioCadastrado[];
   aoFechar: () => void;
   aoAdicionar: (item: Omit<ItemDoCarrinho, "chave">) => void;
+  /** O negocio recem-criado entra na agenda sem esperar a proxima visita. */
+  aoCadastrarNegocio: (negocio: NegocioCadastrado) => void;
 }) {
   if (!produto) return null;
 
@@ -45,8 +56,10 @@ export function ModalItem({
       key={produto.id}
       produto={produto}
       corInicial={cor}
+      negocios={negocios}
       aoFechar={aoFechar}
       aoAdicionar={aoAdicionar}
+      aoCadastrarNegocio={aoCadastrarNegocio}
     />
   );
 }
@@ -54,13 +67,17 @@ export function ModalItem({
 function Formulario({
   produto,
   corInicial,
+  negocios,
   aoFechar,
   aoAdicionar,
+  aoCadastrarNegocio,
 }: {
   produto: ProdutoDaVenda;
   corInicial: CorArte | null;
+  negocios: NegocioCadastrado[];
   aoFechar: () => void;
   aoAdicionar: (item: Omit<ItemDoCarrinho, "chave">) => void;
+  aoCadastrarNegocio: (negocio: NegocioCadastrado) => void;
 }) {
   const placa = produto.produto_avaliacao;
 
@@ -68,6 +85,7 @@ function Formulario({
   const [quantidade, setQuantidade] = useState(1);
   const [negocio, setNegocio] = useState<NegocioEscolhido | null>(null);
   const [nomeNegocio, setNomeNegocio] = useState("");
+  const [gravando, comecarAGravar] = useTransition();
 
   const campoDoNegocio = useRef<HTMLInputElement>(null);
 
@@ -81,19 +99,58 @@ function Formulario({
   }
 
   function confirmar() {
-    if (placa) {
-      if (!negocio) {
-        avisar.atencao("Encontre o negócio no Google para o QR abrir a avaliação.");
-        return;
-      }
-
-      if (nomeNegocio.trim().length < 2) {
-        avisar.atencao("Digite o nome do negócio que vai impresso nesta placa.");
-        campoDoNegocio.current?.focus();
-        return;
-      }
+    if (!placa) {
+      adicionar();
+      return;
     }
 
+    if (!negocio) {
+      avisar.atencao("Escolha um negócio da sua lista ou encontre no Google.");
+      return;
+    }
+
+    const nome = nomeNegocio.trim();
+    if (nome.length < 2) {
+      avisar.atencao("Digite o nome do negócio que vai impresso nesta placa.");
+      campoDoNegocio.current?.focus();
+      return;
+    }
+
+    // Veio da agenda: o cadastro ja existe, nada a gravar.
+    if (negocio.id) {
+      adicionar(negocio.id);
+      return;
+    }
+
+    // Veio do Google ou de um link colado, e vira cadastro aqui, antes de o
+    // item entrar no carrinho. E o unico momento em que o sistema tem o negocio
+    // por inteiro na mao: uma venda que nao fecha ainda deixa registrada a
+    // porta em que se bateu, que e a metade da lista de amanha.
+    comecarAGravar(async () => {
+      const resposta = await garantirNegocio({
+        nome,
+        linkAvaliacao: negocio.linkAvaliacao,
+        placeId: negocio.placeId,
+        endereco: negocio.endereco,
+      });
+
+      if (!resposta.negocioId) {
+        avisar.erro(resposta.erro ?? "Não consegui cadastrar este negócio.");
+        return;
+      }
+
+      aoCadastrarNegocio({
+        id: resposta.negocioId,
+        nome,
+        link_avaliacao: negocio.linkAvaliacao,
+        endereco: negocio.endereco ?? null,
+      });
+
+      adicionar(resposta.negocioId);
+    });
+  }
+
+  function adicionar(negocioId?: string) {
     aoAdicionar({
       produtoId: produto.id,
       tipo: produto.tipo,
@@ -101,6 +158,7 @@ function Formulario({
       precoUnitarioCentavos: produto.preco_centavos,
       quantidade,
       cor: cor ?? undefined,
+      negocioId: placa ? negocioId : undefined,
       nomeNegocio: placa ? nomeNegocio.trim() : undefined,
       linkAvaliacao: placa ? negocio!.linkAvaliacao : undefined,
       placeId: placa ? negocio!.placeId : undefined,
@@ -121,10 +179,15 @@ function Formulario({
       }
       rodape={
         <>
-          <Botao type="button" variante="secundario" onClick={aoFechar}>
+          <Botao type="button" variante="secundario" onClick={aoFechar} disabled={gravando}>
             Cancelar
           </Botao>
-          <Botao type="button" onClick={confirmar}>
+          <Botao
+            type="button"
+            onClick={confirmar}
+            carregando={gravando}
+            carregandoTexto="Salvando negócio..."
+          >
             Adicionar {moeda(produto.preco_centavos * quantidade)}
           </Botao>
         </>
@@ -135,7 +198,11 @@ function Formulario({
           <>
             {/* A busca vem antes do nome de proposito: achado o negocio, o
                 nome ja chega preenchido e o vendedor so ajusta se quiser. */}
-            <BuscaDeNegocio escolhido={negocio} aoEscolher={escolherNegocio} />
+            <BuscaDeNegocio
+              escolhido={negocio}
+              aoEscolher={escolherNegocio}
+              cadastrados={negocios}
+            />
 
             {negocio ? (
               <Campo

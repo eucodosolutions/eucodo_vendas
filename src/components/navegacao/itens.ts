@@ -1,6 +1,7 @@
 import {
   Building2,
   LayoutDashboard,
+  MapPin,
   Package,
   ReceiptText,
   Settings,
@@ -33,6 +34,7 @@ const MENU: Record<PapelUsuario, ItemDeMenu[]> = {
   assinante: [
     { href: "/vender", rotulo: "Vender", icone: Store },
     { href: "/pedidos", rotulo: "Pedidos", icone: ReceiptText },
+    { href: "/negocios", rotulo: "Negócios", icone: MapPin },
     { href: "/clientes", rotulo: "Clientes", icone: Users },
     { href: "/produtos", rotulo: "Produtos", icone: Package },
     { href: "/equipe", rotulo: "Equipe", icone: UserRoundCog },
@@ -41,6 +43,7 @@ const MENU: Record<PapelUsuario, ItemDeMenu[]> = {
   vendedor: [
     { href: "/vender", rotulo: "Vender", icone: Store },
     { href: "/pedidos", rotulo: "Pedidos", icone: ReceiptText },
+    { href: "/negocios", rotulo: "Negócios", icone: MapPin },
     { href: "/clientes", rotulo: "Clientes", icone: Users },
   ],
 };
@@ -50,8 +53,13 @@ const MENU: Record<PapelUsuario, ItemDeMenu[]> = {
  *
  * Sao quatro, e nao cinco, porque na tela de venda o carrinho ocupa a fatia do
  * meio: com cinco itens mais o carrinho a barra chegava a seis alvos e cada um
- * ficava mais estreito que o dedo. Produtos, que se mexe uma vez por mes, desce
- * para o "Mais" e deixa a barra para Vender, Pedidos e Clientes.
+ * ficava mais estreito que o dedo.
+ *
+ * Quem decide o que fica e a ordem da lista acima, e ela segue o dia de
+ * trabalho. Negocios entra em terceiro nos dois papeis: e por ele que o dia
+ * comeca, montando a rota, e e dele que sai o link de cada placa. No assinante
+ * quem desce para o "Mais" e Clientes — o cadastro de quem paga acontece de
+ * dentro do fechamento do pedido, e quase nunca por esta tela.
  */
 const CABEM_NA_BARRA = 4;
 

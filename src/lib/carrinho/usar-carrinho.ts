@@ -68,10 +68,16 @@ export function useCarrinho() {
 
     // O mesmo produto, na mesma cor e para a mesma empresa, vira quantidade e
     // nao linha repetida.
+    //
+    // O cadastro entra na comparacao junto com o nome impresso, e nao no lugar
+    // dele: duas filiais podem estar cadastradas com o mesmo nome, e ai sao
+    // dois negocios, dois links e duas linhas. O nome sozinho as juntaria numa
+    // placa so, com o QR de uma delas.
     const igual = atuais.findIndex(
       (linha) =>
         linha.produtoId === item.produtoId &&
         linha.cor === item.cor &&
+        linha.negocioId === item.negocioId &&
         negocio(linha.nomeNegocio) === negocio(item.nomeNegocio),
     );
 

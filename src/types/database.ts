@@ -108,8 +108,29 @@ export type Cliente = {
   assinatura_id: string;
   nome: string;
   whatsapp: string;
+  observacoes: string | null;
+  criado_por: string | null;
+  criado_em: string;
+  atualizado_em: string;
+};
+
+/**
+ * O lugar que recebe a placa, que nao e quem paga por ela.
+ *
+ * Cliente exige WhatsApp porque e para ele que o sistema manda arte e PIX. O
+ * negocio nasce antes disso, no planejamento da rota, quando o WhatsApp do dono
+ * ainda nao existe — por isso sao dois cadastros, e nao um com campos opcionais.
+ *
+ * `link_avaliacao` e a identidade da linha, e nao `google_place_id`: quem ja
+ * gerencia o proprio perfil chega com o link na mao e nunca passa pela busca.
+ */
+export type Negocio = {
+  id: string;
+  assinatura_id: string;
+  nome: string;
+  link_avaliacao: string;
   google_place_id: string | null;
-  link_avaliacao: string | null;
+  endereco: string | null;
   observacoes: string | null;
   criado_por: string | null;
   criado_em: string;
@@ -164,6 +185,12 @@ export type PedidoItem = {
   nome_negocio: string | null;
   link_avaliacao: string | null;
   google_place_id: string | null;
+  /**
+   * De qual cadastro este item saiu. Ponteiro de historico, e nao a fonte do
+   * que foi impresso: o nome e o link acima e que valem, e ficam como estavam
+   * no dia da venda mesmo depois de o negocio ser renomeado ou apagado.
+   */
+  negocio_id: string | null;
   produto_nome: string;
   cor: CorArte | null;
   tecnologia: TecnologiaArte | null;
@@ -259,6 +286,10 @@ export type Database = {
       clientes: Tabela<
         Cliente,
         Pick<Cliente, "assinatura_id" | "nome" | "whatsapp"> & Partial<Cliente>
+      >;
+      negocios: Tabela<
+        Negocio,
+        Pick<Negocio, "assinatura_id" | "nome" | "link_avaliacao"> & Partial<Negocio>
       >;
       // Total e comissao ficam de fora do Insert: quem calcula os dois e o
       // gatilho `recalcular_pedido`, a partir dos itens.

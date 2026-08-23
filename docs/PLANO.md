@@ -141,6 +141,31 @@ numero que o dono ja tem cadastrado barraria o cadastro do vendedor sem lhe dar 
 — ele nao veria o cliente para escolher, e nao conseguiria criar. Repetido para a mesma
 pessoa continua barrado, que e o caso que de fato parte o historico de compra em dois.
 
+## Negocios
+
+Cliente e quem paga; **negocio** e o lugar que recebe a placa. Sao dois cadastros porque nascem
+em momentos diferentes: o negocio entra no planejamento da rota, quando ainda nao existe
+conversa com ninguem e portanto nao existe WhatsApp, e o cliente so aparece na hora de fechar
+o pedido. Um cliente pode levar placa de dois negocios, e um negocio pode ser pago por gente
+diferente em duas compras.
+
+A identidade da linha e o `link_avaliacao`, e nao o `google_place_id`: quem gerencia o proprio
+perfil chega com o link na mao e nunca passa pela busca. A unicidade e por autor
+(`assinatura_id, link_avaliacao, criado_por`), pelo mesmo motivo da de cliente, e a
+visibilidade tambem — o vendedor manda no que cadastrou, o dono da conta manda na conta
+inteira.
+
+O negocio entra por tres caminhos, que sao as tres abas do `BuscaDeNegocio`: escolher um
+cadastrado, pesquisar no Google Places ou colar o link. Os dois ultimos cadastram na hora,
+por `garantirNegocio`, no momento em que o item entra no carrinho — e nao no fechamento. A
+visita que nao vira venda continua valendo: e a metade da rota do dia seguinte.
+
+`pedido_itens.negocio_id` e ponteiro de historico, com `ON DELETE SET NULL`. O que foi
+impresso continua carimbado no proprio item (`nome_negocio`, `link_avaliacao`), como
+`produto_nome` e o preco: renomear ou apagar o negocio nao mexe em placa ja vendida. E por
+isso que o nome do cadastro e o nome impresso sao campos separados — o primeiro e como a
+pessoa organiza a agenda dela, o segundo e o que vai no acrilico.
+
 ## Carrinho
 
 Um pedido tem itens. `pedidos` guarda cliente, total, status, comissao e prazo; `pedido_itens`

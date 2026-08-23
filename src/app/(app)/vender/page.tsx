@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import type { ClienteDaLista } from "./escolher-cliente";
 import { VendaRapida, type ProdutoDaVenda } from "./venda-rapida";
+import type { NegocioCadastrado } from "@/components/ui/busca-de-negocio";
 import { LinkBotao } from "@/components/ui/link-botao";
 import { Secao } from "@/components/ui/secao";
 import { previasDaPlaca } from "@/lib/art/vitrine";
@@ -17,30 +18,40 @@ export default async function PaginaVender() {
   const supabase = await createClient();
   const sessao = await sessaoDoPainel();
 
-  const [{ data: catalogo }, { data: clientes }, { data: pix }] = await Promise.all([
-    supabase
-      .from("produtos")
-      .select(
-        `id, tipo, nome, descricao, foto_path, preco_centavos, prazo_entrega_dias, ${detalheDaPlaca("largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi, cores, tecnologia")}`,
-      )
-      .eq("ativo", true)
-      .order("ordem")
-      .order("nome")
-      .returns<ProdutoDoBanco[]>(),
-    // A lista inteira vem de uma vez e o filtro roda no navegador: com o cliente
-    // na frente, buscar no servidor a cada letra custaria mais que vale.
-    supabase
-      .from("clientes")
-      .select("id, nome, whatsapp")
-      .order("nome")
-      .limit(300)
-      .returns<ClienteDaLista[]>(),
-    // So a existencia da chave interessa aqui: e ela que decide se o fechamento
-    // pode prometer o PIX copia e cola. Vai pela funcao, e nao pela tabela,
-    // porque `configuracoes` so abre para o assinante e esta tela e do vendedor
-    // tambem. O codigo em si e montado no servidor, no fechamento.
-    supabase.rpc("pix_da_conta").maybeSingle(),
-  ]);
+  const [{ data: catalogo }, { data: clientes }, { data: negocios }, { data: pix }] =
+    await Promise.all([
+      supabase
+        .from("produtos")
+        .select(
+          `id, tipo, nome, descricao, foto_path, preco_centavos, prazo_entrega_dias, ${detalheDaPlaca("largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi, cores, tecnologia")}`,
+        )
+        .eq("ativo", true)
+        .order("ordem")
+        .order("nome")
+        .returns<ProdutoDoBanco[]>(),
+      // A lista inteira vem de uma vez e o filtro roda no navegador: com o cliente
+      // na frente, buscar no servidor a cada letra custaria mais que vale.
+      supabase
+        .from("clientes")
+        .select("id, nome, whatsapp")
+        .order("nome")
+        .limit(300)
+        .returns<ClienteDaLista[]>(),
+      // A agenda de negocios, pelo mesmo motivo: e a rota que a pessoa montou
+      // ontem, e ela precisa estar na mao ao adicionar a placa. Pelo mais
+      // recente, que e a ordem em que a rota foi cadastrada.
+      supabase
+        .from("negocios")
+        .select("id, nome, link_avaliacao, endereco")
+        .order("criado_em", { ascending: false })
+        .limit(300)
+        .returns<NegocioCadastrado[]>(),
+      // So a existencia da chave interessa aqui: e ela que decide se o fechamento
+      // pode prometer o PIX copia e cola. Vai pela funcao, e nao pela tabela,
+      // porque `configuracoes` so abre para o assinante e esta tela e do vendedor
+      // tambem. O codigo em si e montado no servidor, no fechamento.
+      supabase.rpc("pix_da_conta").maybeSingle(),
+    ]);
 
   // Placa sem medida nao gera arte: fica fora da venda ate o dono completar o
   // cadastro, em vez de quebrar no fechamento do pedido.
@@ -82,6 +93,7 @@ export default async function PaginaVender() {
     <VendaRapida
       produtos={produtos}
       clientes={clientes ?? []}
+      negocios={negocios ?? []}
       pixConfigurado={Boolean(pix?.pix_chave)}
     />
   );

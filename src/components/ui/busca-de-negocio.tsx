@@ -1,7 +1,7 @@
 "use client";
 
-import { Check, ExternalLink, Loader2, MapPin, Search, X } from "lucide-react";
-import { useId, useState } from "react";
+import { Check, ExternalLink, Loader2, MapPin, Search, Store, X } from "lucide-react";
+import { useId, useMemo, useState } from "react";
 
 import { ALTURA_CONTROLE, BORDA_ERRO, BORDA_NORMAL, juntar, MOLDURA_CONTROLE } from "./controle";
 import { validarLinkAvaliacao } from "@/lib/formato";
@@ -9,40 +9,67 @@ import { buscarNegocio, type NegocioEncontrado } from "@/lib/places/buscar";
 
 /** O que a tela precisa saber depois que o negocio foi resolvido. */
 export type NegocioEscolhido = {
+  /** So existe quando veio da lista: os outros dois caminhos ainda vao cadastrar. */
+  id?: string;
   nome: string;
   linkAvaliacao: string;
   /** So existe quando veio da busca; o link colado a mao nao tem id. */
   placeId?: string;
+  endereco?: string;
+};
+
+/** Uma linha da agenda de negocios, do jeito que a lista chega do servidor. */
+export type NegocioCadastrado = {
+  id: string;
+  nome: string;
+  link_avaliacao: string;
+  endereco: string | null;
 };
 
 const MINIMO_DE_BUSCA = 3;
+const CABEM_NA_LISTA = 6;
+
+type Modo = "cadastrados" | "busca" | "link";
 
 /**
  * Como o link de avaliacao entra no sistema.
  *
- * O caminho normal e buscar o negocio no Google, porque o link que abre a caixa
- * de avaliacao so existe dentro do painel de quem gerencia o perfil — de fora,
- * quem sabe monta-lo e a Places API. Colar o encurtado do Maps parece dar certo
- * e nao da: vira um QR que abre a ficha do negocio, onde ninguem avalia.
+ * Sao tres jeitos de responder a mesma pergunta — que negocio e este? — e por
+ * isso sao abas, e nao links soltos: um deles esta sempre valendo.
  *
- * A busca so acontece no clique, e nunca enquanto se digita. Cada chamada e
- * paga, e busca por tecla cobra o caminho inteiro do nome — "B", "Ba", "Bar" —
- * para entregar so a ultima. O nome tambem costuma vir errado da memoria de
- * quem vende, entao o "Abrir no Google" esta ali para o nome exato ser copiado
- * de la e colado aqui: uma chamada, com o termo certo.
+ *   1. A agenda. O negocio ja foi cadastrado, na rota de ontem ou numa venda
+ *      anterior, e escolhe-lo nao custa busca nenhuma nem chance de errar o
+ *      link. So aparece para quem recebeu a lista.
+ *   2. A busca no Google. O caminho de quem chega num negocio novo: o link que
+ *      abre a caixa de avaliacao so existe dentro do painel de quem gerencia o
+ *      perfil, e de fora quem sabe monta-lo e a Places API.
+ *   3. O link colado. Quem gerencia o proprio perfil ja tem o link certo.
  *
- * Os dois caminhos sao abas, e nao links soltos, porque sao mesmo dois jeitos
- * de responder a mesma pergunta — e um deles esta sempre valendo. Como link,
- * pareciam saida de emergencia de um caminho unico que deu errado.
+ * Colar o encurtado do Maps parece dar certo e nao da: vira um QR que abre a
+ * ficha do negocio, onde ninguem avalia.
+ *
+ * A busca no Google so acontece no clique, e nunca enquanto se digita. Cada
+ * chamada e paga, e busca por tecla cobra o caminho inteiro do nome — "B",
+ * "Ba", "Bar" — para entregar so a ultima. O nome tambem costuma vir errado da
+ * memoria de quem vende, entao o "Abrir no Google" esta ali para o nome exato
+ * ser copiado de la e colado aqui: uma chamada, com o termo certo.
  */
 export function BuscaDeNegocio({
   escolhido,
   aoEscolher,
+  cadastrados,
 }: {
   escolhido: NegocioEscolhido | null;
   aoEscolher: (negocio: NegocioEscolhido | null) => void;
+  /**
+   * A agenda de quem esta vendendo. Ausente no proprio cadastro de negocio, que
+   * existe justamente para criar o que ainda nao esta nela.
+   */
+  cadastrados?: NegocioCadastrado[];
 }) {
-  const [modo, setModo] = useState<"busca" | "link">("busca");
+  const temAgenda = Boolean(cadastrados && cadastrados.length > 0);
+
+  const [modo, setModo] = useState<Modo>(temAgenda ? "cadastrados" : "busca");
   const [termo, setTermo] = useState("");
   const [resultados, setResultados] = useState<NegocioEncontrado[]>([]);
   const [buscando, setBuscando] = useState(false);
@@ -82,6 +109,7 @@ export function BuscaDeNegocio({
     setResultados([]);
     setErro(null);
     setJaBuscou(false);
+    setModo(temAgenda ? "cadastrados" : "busca");
   }
 
   return (
@@ -92,7 +120,7 @@ export function BuscaDeNegocio({
         </span>
 
         {/* Discreto de proposito: e apoio para achar o nome certo, e nao o
-            caminho. Some com o negocio ja resolvido e no modo de colar link. */}
+            caminho. Some com o negocio ja resolvido e fora da busca paga. */}
         {!escolhido && modo === "busca" ? (
           <a
             href={
@@ -117,7 +145,9 @@ export function BuscaDeNegocio({
             <p className="truncate text-sm font-medium text-marca">
               {escolhido.nome || "Link do próprio perfil"}
             </p>
-            <p className="truncate text-xs text-tinta-suave">{escolhido.linkAvaliacao}</p>
+            <p className="truncate text-xs text-tinta-suave">
+              {escolhido.endereco ?? escolhido.linkAvaliacao}
+            </p>
           </div>
           <button
             type="button"
@@ -131,13 +161,23 @@ export function BuscaDeNegocio({
       ) : (
         <>
           <div className="flex gap-4 border-b border-borda">
+            {temAgenda ? (
+              <Aba ativa={modo === "cadastrados"} aoTocar={() => setModo("cadastrados")}>
+                Meus negócios
+              </Aba>
+            ) : null}
             <Aba ativa={modo === "busca"} aoTocar={() => setModo("busca")}>
-              Pesquisar no Google
+              {/* Com tres abas os rotulos longos nao cabem num celular. */}
+              {temAgenda ? "Pesquisar" : "Pesquisar no Google"}
             </Aba>
             <Aba ativa={modo === "link"} aoTocar={() => setModo("link")}>
-              Já tenho o link
+              {temAgenda ? "Tenho o link" : "Já tenho o link"}
             </Aba>
           </div>
+
+          {modo === "cadastrados" ? (
+            <Agenda negocios={cadastrados ?? []} aoEscolher={aoEscolher} />
+          ) : null}
 
           {modo === "busca" ? (
             <>
@@ -195,6 +235,7 @@ export function BuscaDeNegocio({
                             nome: negocio.nome,
                             linkAvaliacao: negocio.linkAvaliacao,
                             placeId: negocio.placeId,
+                            endereco: negocio.endereco,
                           })
                         }
                         className="flex w-full items-start gap-3 bg-superficie px-3 py-2.5 text-left transition-colors hover:bg-papel"
@@ -222,12 +263,103 @@ export function BuscaDeNegocio({
                 </p>
               ) : null}
             </>
-          ) : (
+          ) : null}
+
+          {modo === "link" ? (
             <ColarLink aoColar={(link) => aoEscolher({ nome: "", linkAvaliacao: link })} />
-          )}
+          ) : null}
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * A agenda: os negocios que ja estao cadastrados.
+ *
+ * Ao contrario da busca de cliente, aqui a lista aparece antes de qualquer
+ * digitacao. Sao coisas diferentes: a agenda de clientes de uma conta rodada
+ * tem trezentos nomes, e mostrar seis por acaso nao responde nada. A lista de
+ * negocios do vendedor e a rota que ele mesmo montou ontem — os primeiros seis
+ * sao, na maior parte dos dias, exatamente as portas em que ele vai bater.
+ */
+function Agenda({
+  negocios,
+  aoEscolher,
+}: {
+  negocios: NegocioCadastrado[];
+  aoEscolher: (negocio: NegocioEscolhido) => void;
+}) {
+  const [termo, setTermo] = useState("");
+
+  const encontrados = useMemo(() => {
+    const alvo = termo.trim().toLowerCase();
+    const lista = alvo
+      ? negocios.filter(
+          (negocio) =>
+            negocio.nome.toLowerCase().includes(alvo) ||
+            (negocio.endereco ?? "").toLowerCase().includes(alvo),
+        )
+      : negocios;
+
+    return lista.slice(0, CABEM_NA_LISTA);
+  }, [termo, negocios]);
+
+  return (
+    <>
+      <input
+        type="search"
+        aria-label="Buscar nos meus negócios"
+        autoComplete="off"
+        placeholder="Buscar por nome ou endereço"
+        value={termo}
+        // Enter aqui nao faz nada: o filtro ja rodou a cada tecla, e sem isto
+        // ele submeteria o popup que envolve o campo.
+        onKeyDown={(evento) => {
+          if (evento.key === "Enter") evento.preventDefault();
+        }}
+        onChange={(evento) => setTermo(evento.target.value)}
+        className={juntar(
+          ALTURA_CONTROLE,
+          MOLDURA_CONTROLE,
+          BORDA_NORMAL,
+          "px-3 placeholder:text-tinta-suave/70",
+        )}
+      />
+
+      {encontrados.length === 0 ? (
+        <p className="text-xs text-tinta-suave">
+          Nenhum negócio com esse nome. Pesquise no Google para cadastrar um novo.
+        </p>
+      ) : (
+        <ul className="divide-y divide-borda overflow-hidden rounded-lg border border-borda">
+          {encontrados.map((negocio) => (
+            <li key={negocio.id}>
+              <button
+                type="button"
+                onClick={() =>
+                  aoEscolher({
+                    id: negocio.id,
+                    nome: negocio.nome,
+                    linkAvaliacao: negocio.link_avaliacao,
+                    endereco: negocio.endereco ?? undefined,
+                  })
+                }
+                className="flex w-full items-start gap-3 bg-superficie px-3 py-2.5 text-left transition-colors hover:bg-papel"
+              >
+                <Store size={15} aria-hidden className="mt-0.5 shrink-0 text-tinta-suave" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-tinta">{negocio.nome}</p>
+                  {negocio.endereco ? (
+                    <p className="truncate text-xs text-tinta-suave">{negocio.endereco}</p>
+                  ) : null}
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 
