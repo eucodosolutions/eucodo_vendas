@@ -93,7 +93,7 @@ Tudo em portugues, e quase tudo com dono (`assinatura_id`):
 - `modelos_mensagem`: texto por evento. **Ainda global**, e a proxima divida do microsaas
 - `configuracoes`: uma linha por conta, com PIX e instancia de WhatsApp. O prazo saiu
   daqui: e dado do produto, e o pedido herda o maior entre os itens
-- `instancias_whatsapp`: fornecidas pela plataforma, token cifrado no Vault
+- `instancias_whatsapp`: fornecidas pela plataforma, uma por conta, token cifrado no Vault
 
 ## Auth e papeis
 
@@ -196,6 +196,7 @@ Tudo salvo no Supabase Storage, em bucket privado com URL assinada.
 11. [feito] Multiassinatura: papeis, painel admin, clientes, carrinho, navegacao e PWA
 12. [feito] Produto por tipo: placa de avaliacao e padrao, comissao e prazo no produto
 13. [feito] Acesso so pela assinatura, Produtos em aba propria e cadastro em popup
+14. [feito] WhatsApp em Ajustes: o assinante conecta por QR code, e a instancia e da conta
 
 Passo a passo para subir o ambiente: `docs/CONFIGURACAO.md`.
 
@@ -203,7 +204,8 @@ Passo a passo para subir o ambiente: `docs/CONFIGURACAO.md`.
 
 - Preco de cada produto (agora e um por produto, e nao um por SKU)
 - Chave PIX + nome e cidade do recebedor
-- uazapi: host do servidor e token da instancia
+- uazapi: host do servidor e **admintoken** da conta, para a plataforma criar a
+  instancia de cada assinante (vao em Edge Functions, Secrets, e nao no `.env`)
 - Google Places API key
 - Regra de entrega e frete (o prazo ja e por produto)
 - Confirmar a medida do A6: os px enviados (1216,54 x 1724,41) equivalem a
