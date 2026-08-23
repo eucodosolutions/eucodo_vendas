@@ -59,6 +59,24 @@ export function VendaRapida({
   const [estado, fechar, fechando] = useActionState<EstadoVenda, PedidoDoCarrinho>(criarPedido, {});
   useAviso(estado);
 
+  // O botao do fechamento nao pode depender so do `fechando`.
+  //
+  // Fechar um pedido leva segundos de verdade: o servidor grava os itens,
+  // desenha a arte de cada placa, monta o PIX e ainda chama o WhatsApp. Depois
+  // disso a acao termina com `redirect`, e a navegacao ate a tela do pedido e
+  // outro tempo, ja fora da acao — o `fechando` cai ali no meio e devolve o
+  // botao inteiro, com o popup ainda aberto e nada tendo mudado na tela. Quem
+  // esta vendendo le isso como clique perdido e aperta de novo, que e pedido
+  // dobrado.
+  //
+  // O que fica guardado e o `estado` de quando o clique aconteceu, e nao um
+  // booleano: os dois desfechos possiveis se leem dele sozinhos. O erro devolve
+  // um objeto novo do `useActionState`, e o botao se solta; o sucesso nunca
+  // devolve nada, porque termina em `redirect`, entao a roda continua girando
+  // ate a tela do pedido aparecer — que e exatamente o que faltava.
+  const [estadoDoClique, setEstadoDoClique] = useState<EstadoVenda | null>(null);
+  const enviando = estadoDoClique !== null && estadoDoClique === estado;
+
   const carrinho = useCarrinho();
 
   // O popup abre com o produto e com a cor que estava na vitrine: quem virou a
@@ -140,8 +158,9 @@ export function VendaRapida({
         itens={carrinho.itens}
         clientes={clientes}
         pixConfigurado={pixConfigurado}
-        fechando={fechando}
-        aoConfirmar={({ cliente, forma, momento, avisarCliente, observacoes }) =>
+        fechando={fechando || enviando}
+        aoConfirmar={({ cliente, forma, momento, avisarCliente, observacoes }) => {
+          setEstadoDoClique(estado);
           fechar({
             clienteId: cliente.id,
             forma,
@@ -157,8 +176,8 @@ export function VendaRapida({
               linkAvaliacao: item.linkAvaliacao,
               placeId: item.placeId,
             })),
-          })
-        }
+          });
+        }}
       />
     </div>
   );
