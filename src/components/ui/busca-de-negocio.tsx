@@ -1,9 +1,8 @@
 "use client";
 
-import { Check, ExternalLink, Link2, MapPin, Search, X } from "lucide-react";
-import { useId, useState, type ReactNode } from "react";
+import { Check, ExternalLink, Loader2, MapPin, Search, X } from "lucide-react";
+import { useId, useState } from "react";
 
-import { Botao } from "./botao";
 import { ALTURA_CONTROLE, BORDA_ERRO, BORDA_NORMAL, juntar, MOLDURA_CONTROLE } from "./controle";
 import { validarLinkAvaliacao } from "@/lib/formato";
 import { buscarNegocio, type NegocioEncontrado } from "@/lib/places/buscar";
@@ -29,11 +28,12 @@ const MINIMO_DE_BUSCA = 3;
  * A busca so acontece no clique, e nunca enquanto se digita. Cada chamada e
  * paga, e busca por tecla cobra o caminho inteiro do nome — "B", "Ba", "Bar" —
  * para entregar so a ultima. O nome tambem costuma vir errado da memoria de
- * quem vende, entao o botao de abrir o Google esta ali para o nome exato ser
- * copiado de la e colado aqui: uma chamada, com o termo certo.
+ * quem vende, entao o "Abrir no Google" esta ali para o nome exato ser copiado
+ * de la e colado aqui: uma chamada, com o termo certo.
  *
- * O campo de colar continua existindo, atras de um clique, para quem chega com
- * o g.page do proprio perfil na mao.
+ * Os dois caminhos sao abas, e nao links soltos, porque sao mesmo dois jeitos
+ * de responder a mesma pergunta — e um deles esta sempre valendo. Como link,
+ * pareciam saida de emergencia de um caminho unico que deu errado.
  */
 export function BuscaDeNegocio({
   escolhido,
@@ -42,12 +42,12 @@ export function BuscaDeNegocio({
   escolhido: NegocioEscolhido | null;
   aoEscolher: (negocio: NegocioEscolhido | null) => void;
 }) {
+  const [modo, setModo] = useState<"busca" | "link">("busca");
   const [termo, setTermo] = useState("");
   const [resultados, setResultados] = useState<NegocioEncontrado[]>([]);
   const [buscando, setBuscando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [jaBuscou, setJaBuscou] = useState(false);
-  const [manual, setManual] = useState(false);
 
   const rotuloId = useId();
   const curto = termo.trim().length < MINIMO_DE_BUSCA;
@@ -84,9 +84,33 @@ export function BuscaDeNegocio({
     setJaBuscou(false);
   }
 
-  if (escolhido) {
-    return (
-      <Moldura rotuloId={rotuloId}>
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-3">
+        <span id={rotuloId} className="text-rotulo font-medium text-tinta">
+          Negócio no Google
+        </span>
+
+        {/* Discreto de proposito: e apoio para achar o nome certo, e nao o
+            caminho. Some com o negocio ja resolvido e no modo de colar link. */}
+        {!escolhido && modo === "busca" ? (
+          <a
+            href={
+              curto
+                ? "https://www.google.com/maps"
+                : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(termo.trim())}`
+            }
+            target="_blank"
+            rel="noreferrer noopener"
+            className="flex items-center gap-1 text-xs text-tinta-suave transition-colors hover:text-marca"
+          >
+            <ExternalLink size={12} aria-hidden />
+            Abrir no Google
+          </a>
+        ) : null}
+      </div>
+
+      {escolhido ? (
         <div className="flex items-start gap-3 rounded-lg border border-marca bg-marca-suave px-3 py-2.5">
           <Check size={16} aria-hidden className="mt-0.5 shrink-0 text-marca" />
           <div className="min-w-0 flex-1">
@@ -104,135 +128,132 @@ export function BuscaDeNegocio({
             <X size={16} aria-hidden />
           </button>
         </div>
-      </Moldura>
-    );
-  }
+      ) : (
+        <>
+          <div className="flex gap-4 border-b border-borda">
+            <Aba ativa={modo === "busca"} aoTocar={() => setModo("busca")}>
+              Pesquisar no Google
+            </Aba>
+            <Aba ativa={modo === "link"} aoTocar={() => setModo("link")}>
+              Já tenho o link
+            </Aba>
+          </div>
 
-  if (manual) {
-    return (
-      <Moldura rotuloId={rotuloId}>
-        <ColarLink
-          aoColar={(link) => aoEscolher({ nome: "", linkAvaliacao: link })}
-          aoDesistir={() => setManual(false)}
-        />
-      </Moldura>
-    );
-  }
+          {modo === "busca" ? (
+            <>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  aria-labelledby={rotuloId}
+                  autoComplete="off"
+                  placeholder="Cole aqui o nome exato do negócio"
+                  value={termo}
+                  onChange={(evento) => digitar(evento.target.value)}
+                  // Enter dentro de um popup que tem botao de salvar submeteria
+                  // o popup inteiro. Aqui ele pesquisa, que e o que se espera de
+                  // um campo de busca.
+                  onKeyDown={(evento) => {
+                    if (evento.key !== "Enter") return;
+                    evento.preventDefault();
+                    void pesquisar();
+                  }}
+                  className={juntar(
+                    ALTURA_CONTROLE,
+                    MOLDURA_CONTROLE,
+                    BORDA_NORMAL,
+                    "flex-1 px-3 placeholder:text-tinta-suave/70",
+                  )}
+                />
 
-  return (
-    <Moldura rotuloId={rotuloId}>
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search
-            size={16}
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-tinta-suave"
-          />
-          <input
-            type="text"
-            aria-labelledby={rotuloId}
-            autoComplete="off"
-            placeholder="Cole aqui o nome exato do negócio"
-            value={termo}
-            onChange={(evento) => digitar(evento.target.value)}
-            // Enter dentro de um popup que tem botao de salvar submeteria o
-            // popup inteiro. Aqui ele pesquisa, que e o que se espera de um
-            // campo de busca.
-            onKeyDown={(evento) => {
-              if (evento.key !== "Enter") return;
-              evento.preventDefault();
-              void pesquisar();
-            }}
-            className={juntar(
-              ALTURA_CONTROLE,
-              MOLDURA_CONTROLE,
-              BORDA_NORMAL,
-              "pr-3 pl-9 placeholder:text-tinta-suave/70",
-            )}
-          />
-        </div>
+                <button
+                  type="button"
+                  onClick={() => void pesquisar()}
+                  disabled={curto || buscando}
+                  aria-label="Pesquisar no Google"
+                  className={juntar(
+                    ALTURA_CONTROLE,
+                    "flex w-10 shrink-0 items-center justify-center rounded-lg border border-borda-forte bg-superficie text-tinta transition-colors",
+                    "hover:border-tinta-suave disabled:opacity-50 disabled:hover:border-borda-forte",
+                  )}
+                >
+                  {buscando ? (
+                    <Loader2 size={16} aria-hidden className="animate-spin" />
+                  ) : (
+                    <Search size={16} aria-hidden />
+                  )}
+                </button>
+              </div>
 
-        <Botao
-          type="button"
-          variante="secundario"
-          onClick={() => void pesquisar()}
-          disabled={curto || buscando}
-          carregandoTexto="Buscando..."
-        >
-          {buscando ? "Buscando..." : "Pesquisar"}
-        </Botao>
-      </div>
+              {resultados.length > 0 ? (
+                <ul className="divide-y divide-borda overflow-hidden rounded-lg border border-borda">
+                  {resultados.map((negocio) => (
+                    <li key={negocio.placeId}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          aoEscolher({
+                            nome: negocio.nome,
+                            linkAvaliacao: negocio.linkAvaliacao,
+                            placeId: negocio.placeId,
+                          })
+                        }
+                        className="flex w-full items-start gap-3 bg-superficie px-3 py-2.5 text-left transition-colors hover:bg-papel"
+                      >
+                        <MapPin
+                          size={15}
+                          aria-hidden
+                          className="mt-0.5 shrink-0 text-tinta-suave"
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-tinta">{negocio.nome}</p>
+                          <p className="truncate text-xs text-tinta-suave">{negocio.endereco}</p>
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
 
-      {resultados.length > 0 ? (
-        <ul className="divide-y divide-borda overflow-hidden rounded-lg border border-borda">
-          {resultados.map((negocio) => (
-            <li key={negocio.placeId}>
-              <button
-                type="button"
-                onClick={() =>
-                  aoEscolher({
-                    nome: negocio.nome,
-                    linkAvaliacao: negocio.linkAvaliacao,
-                    placeId: negocio.placeId,
-                  })
-                }
-                className="flex w-full items-start gap-3 bg-superficie px-3 py-2.5 text-left transition-colors hover:bg-papel"
-              >
-                <MapPin size={15} aria-hidden className="mt-0.5 shrink-0 text-tinta-suave" />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-tinta">{negocio.nome}</p>
-                  <p className="truncate text-xs text-tinta-suave">{negocio.endereco}</p>
-                </div>
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+              {erro ? <p className="text-xs font-medium text-erro">{erro}</p> : null}
 
-      {erro ? <p className="text-xs font-medium text-erro">{erro}</p> : null}
-
-      {!erro && jaBuscou && resultados.length === 0 ? (
-        <p className="text-xs text-tinta-suave">
-          Nada com esse nome. Abra o Google e copie o nome como está escrito lá.
-        </p>
-      ) : null}
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <a
-          href={
-            curto
-              ? "https://www.google.com/maps"
-              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(termo.trim())}`
-          }
-          target="_blank"
-          rel="noreferrer noopener"
-          className="flex items-center gap-1.5 text-xs font-medium text-marca transition-colors hover:text-marca-escura"
-        >
-          <ExternalLink size={13} aria-hidden />
-          Abrir o Google para achar o nome
-        </a>
-
-        <button
-          type="button"
-          onClick={() => setManual(true)}
-          className="flex items-center gap-1.5 text-xs font-medium text-marca transition-colors hover:text-marca-escura"
-        >
-          <Link2 size={13} aria-hidden />
-          Já tenho o link do perfil
-        </button>
-      </div>
-    </Moldura>
+              {!erro && jaBuscou && resultados.length === 0 ? (
+                <p className="text-xs text-tinta-suave">
+                  Nada com esse nome. Abra o Google e copie o nome como está escrito lá.
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <ColarLink aoColar={(link) => aoEscolher({ nome: "", linkAvaliacao: link })} />
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
-function Moldura({ rotuloId, children }: { rotuloId: string; children: ReactNode }) {
+function Aba({
+  ativa,
+  aoTocar,
+  children,
+}: {
+  ativa: boolean;
+  aoTocar: () => void;
+  children: string;
+}) {
   return (
-    <div className="flex flex-col gap-2">
-      <span id={rotuloId} className="text-rotulo font-medium text-tinta">
-        Negócio no Google
-      </span>
+    <button
+      type="button"
+      onClick={aoTocar}
+      aria-pressed={ativa}
+      className={juntar(
+        "-mb-px border-b-2 pb-2 text-sm font-medium transition-colors",
+        ativa
+          ? "border-marca text-marca"
+          : "border-transparent text-tinta-suave hover:text-tinta",
+      )}
+    >
       {children}
-    </div>
+    </button>
   );
 }
 
@@ -243,13 +264,7 @@ function Moldura({ rotuloId, children }: { rotuloId: string; children: ReactNode
  * problema antigo: o link e do Google, abre normalmente, e leva para a ficha do
  * negocio em vez do formulario de avaliacao.
  */
-function ColarLink({
-  aoColar,
-  aoDesistir,
-}: {
-  aoColar: (link: string) => void;
-  aoDesistir: () => void;
-}) {
+function ColarLink({ aoColar }: { aoColar: (link: string) => void }) {
   const [texto, setTexto] = useState("");
   const [erro, setErro] = useState<string | null>(null);
 
@@ -270,7 +285,6 @@ function ColarLink({
         type="url"
         inputMode="url"
         autoComplete="off"
-        autoFocus
         placeholder="https://g.page/r/.../review"
         value={texto}
         onChange={(evento) => {
@@ -302,15 +316,6 @@ function ColarLink({
           do Maps não serve: ele abre a ficha, não a avaliação.
         </p>
       )}
-
-      <button
-        type="button"
-        onClick={aoDesistir}
-        className="flex items-center gap-1.5 self-start text-xs font-medium text-marca transition-colors hover:text-marca-escura"
-      >
-        <Search size={13} aria-hidden />
-        Procurar o negócio no Google
-      </button>
     </>
   );
 }
