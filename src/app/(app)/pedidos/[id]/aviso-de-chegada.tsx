@@ -24,7 +24,13 @@ export function AvisoDeChegada({ envio }: { envio?: string }) {
 
     esvaziarCarrinho();
 
-    if (envio === "link") {
+    if (envio === "nao") {
+      // Nao e atencao: o vendedor desligou o aviso de proposito. So lembra por
+      // onde a mensagem sai quando ele decidir mandar.
+      avisar.sucesso(
+        "Pedido criado e artes geradas. O cliente não foi avisado — use Mandar as artes no WhatsApp quando quiser.",
+      );
+    } else if (envio === "link") {
       avisar.atencao(
         "Pedido criado e artes geradas. Sem instância conectada, use Mandar as artes no WhatsApp.",
       );

@@ -10,6 +10,11 @@ import { whatsappLegivel } from "@/lib/formato";
 
 export type ClienteDaLista = { id: string; nome: string; whatsapp: string };
 
+/** Termo que so tem numero e pontuacao de telefone: quem digita assim quer um numero. */
+function pareceNumero(termo: string): boolean {
+  return /^[\d\s()+.-]+$/.test(termo) && termo.replace(/\D/g, "").length >= 3;
+}
+
 /**
  * O passo do fecho: para quem e este pedido.
  *
@@ -19,8 +24,16 @@ export type ClienteDaLista = { id: string; nome: string; whatsapp: string };
  *
  * A lista inteira da conta vem do servidor e o filtro roda aqui, sem ida e
  * volta: com o cliente na frente, esperar a rede para achar um nome que ja
- * esta na tela seria tempo jogado fora. Quem nao esta na lista e cadastrado num
- * popup, no mesmo formulario da tela de Clientes, e ja entra escolhido.
+ * esta na tela seria tempo jogado fora.
+ *
+ * Nada aparece antes da busca. A lista abria com os seis primeiros nomes da
+ * conta, que numa conta com trezentos clientes eram seis nomes por acaso — o
+ * vendedor lia uma lista que nao respondia nada e ainda arriscava tocar no
+ * cliente errado, com o proximo homonimo logo abaixo.
+ *
+ * O cadastro e a ultima linha do resultado, e nao um botao a parte: quem nao
+ * achou o cliente ja esta olhando para ali, com o nome digitado na mao. O que
+ * foi digitado entra no popup pronto, no campo que ele parece ser.
  */
 export function EscolherCliente({
   clientes,
@@ -40,20 +53,23 @@ export function EscolherCliente({
   const [novos, setNovos] = useState<ClienteDaLista[]>([]);
   const lista = useMemo(() => [...novos, ...clientes], [novos, clientes]);
 
-  const encontrados = useMemo(() => {
-    const termo = busca.trim().toLowerCase();
-    const digitos = termo.replace(/\D/g, "");
+  const termo = busca.trim();
+  const ehNumero = pareceNumero(termo);
 
-    if (!termo) return lista.slice(0, 6);
+  const encontrados = useMemo(() => {
+    if (!termo) return [];
+
+    const alvo = termo.toLowerCase();
+    const digitos = termo.replace(/\D/g, "");
 
     return lista
       .filter(
         (cliente) =>
-          cliente.nome.toLowerCase().includes(termo) ||
+          cliente.nome.toLowerCase().includes(alvo) ||
           (digitos.length >= 3 && cliente.whatsapp.includes(digitos)),
       )
       .slice(0, 6);
-  }, [busca, lista]);
+  }, [termo, lista]);
 
   function fecharCadastro() {
     setCadastrando(false);
@@ -99,44 +115,65 @@ export function EscolherCliente({
           aoMudar={(evento) => setBusca(evento.target.value)}
         />
 
-        {encontrados.length > 0 ? (
-          <ul className="flex flex-col gap-1.5">
-            {encontrados.map((cliente) => (
-              <li key={cliente.id}>
-                <button
-                  type="button"
-                  onClick={() => aoEscolher(cliente)}
-                  className="flex w-full items-center gap-3 rounded-lg border border-borda px-3 py-2.5 text-left transition-colors hover:border-marca hover:bg-marca-suave"
-                >
-                  <Check size={16} aria-hidden className="shrink-0 text-tinta-suave" />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-tinta">
-                    {cliente.nome}
-                  </span>
-                  <span className="shrink-0 text-sm text-tinta-suave tabular-nums">
-                    {whatsappLegivel(cliente.whatsapp)}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-tinta-suave">
-            Nenhum cliente com esse nome ou número. Cadastre agora.
-          </p>
-        )}
+        {termo && encontrados.length === 0 ? (
+          <p className="text-sm text-tinta-suave">Nenhum cliente com esse nome ou número.</p>
+        ) : null}
 
-        <div>
-          <Botao type="button" variante="secundario" onClick={() => setCadastrando(true)}>
-            <UserPlus size={16} aria-hidden />
-            Cadastrar cliente novo
-          </Botao>
-        </div>
+        {!termo ? (
+          <p className="text-sm text-tinta-suave">
+            Digite o nome ou o WhatsApp para achar o cliente.
+          </p>
+        ) : null}
+
+        <ul className="flex flex-col gap-1.5">
+          {encontrados.map((cliente) => (
+            <li key={cliente.id}>
+              <button
+                type="button"
+                onClick={() => aoEscolher(cliente)}
+                className="flex w-full items-center gap-3 rounded-lg border border-borda px-3 py-2.5 text-left transition-colors hover:border-marca hover:bg-marca-suave"
+              >
+                <Check size={16} aria-hidden className="shrink-0 text-tinta-suave" />
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-tinta">
+                  {cliente.nome}
+                </span>
+                <span className="shrink-0 text-sm text-tinta-suave tabular-nums">
+                  {whatsappLegivel(cliente.whatsapp)}
+                </span>
+              </button>
+            </li>
+          ))}
+
+          {/* Fica no fim mesmo quando a busca achou gente: dois clientes podem
+              ter o mesmo nome, e o terceiro homonimo ainda precisa nascer. */}
+          <li>
+            <button
+              type="button"
+              onClick={() => setCadastrando(true)}
+              className="flex w-full items-center gap-3 rounded-lg border border-dashed border-borda px-3 py-2.5 text-left transition-colors hover:border-marca hover:bg-marca-suave"
+            >
+              <UserPlus size={16} aria-hidden className="shrink-0 text-tinta-suave" />
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-tinta">
+                {termo ? (
+                  <>
+                    Cadastrar <span className="font-semibold text-marca">{termo}</span> como cliente
+                    novo
+                  </>
+                ) : (
+                  "Cadastrar cliente novo"
+                )}
+              </span>
+            </button>
+          </li>
+        </ul>
       </div>
 
       <ModalCliente
         key={rodada}
         aberto={cadastrando}
         aoFechar={fecharCadastro}
+        nomeSugerido={ehNumero ? undefined : termo}
+        whatsappSugerido={ehNumero ? termo : undefined}
         aoSalvar={aoCadastrar}
       />
     </>

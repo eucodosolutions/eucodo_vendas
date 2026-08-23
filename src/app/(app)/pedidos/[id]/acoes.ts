@@ -7,7 +7,7 @@ import { renderPreviewPng, renderPrintJpg } from "@/lib/art/render";
 import { specDoProduto } from "@/lib/art/spec";
 import { detalheDaPlaca } from "@/lib/catalogo";
 import { createClient } from "@/lib/supabase/server";
-import { enviarWhatsapp, type ChaveMensagem } from "@/lib/whatsapp/enviar";
+import { chaveDoFechamento, enviarWhatsapp, type ChaveMensagem } from "@/lib/whatsapp/enviar";
 import type { FormaPagamento, PedidoItem, StatusPedido } from "@/types/database";
 
 export type EstadoAcao = {
@@ -199,15 +199,38 @@ export async function cancelarPedido(_estado: EstadoAcao, dados: FormData): Prom
   };
 }
 
-/** Reenvia a arte e o resumo, para quando o cliente pede de novo. */
+/**
+ * Reenvia a arte e o resumo, para quando o cliente pede de novo.
+ *
+ * A mensagem e a mesma do fechamento, escolhida pelo que ficou combinado no
+ * pedido. Antes daqui saia sempre o texto generico, entao um pedido fechado em
+ * PIX a vista era cobrado com o copia e cola na primeira mensagem e virava "e
+ * so acertar o pagamento por aqui" na segunda — sem codigo nenhum.
+ */
 export async function reenviarMensagem(_estado: EstadoAcao, dados: FormData): Promise<EstadoAcao> {
   const pedidoId = z.string().uuid().safeParse(dados.get("pedidoId"));
   if (!pedidoId.success) return { erro: "Pedido inválido." };
 
-  const { user } = await sessao();
+  const { supabase, user } = await sessao();
   if (!user) return { erro: "Sessão expirada. Entre de novo." };
 
-  const envio = await enviarWhatsapp(pedidoId.data, "pedido_criado");
+  const { data: pedido } = await supabase
+    .from("pedidos")
+    .select("forma_combinada, momento_pagamento, pix_copia_e_cola")
+    .eq("id", pedidoId.data)
+    .single();
+
+  if (!pedido) return { erro: "Pedido não encontrado." };
+
+  const envio = await enviarWhatsapp(
+    pedidoId.data,
+    chaveDoFechamento({
+      forma: pedido.forma_combinada,
+      momento: pedido.momento_pagamento,
+      temPix: Boolean(pedido.pix_copia_e_cola),
+    }),
+  );
+
   revalidatePath(`/pedidos/${pedidoId.data}`);
 
   return {
