@@ -63,6 +63,13 @@ export function ModalFechamento({
   // depende de Ajustes estar preenchido.
   const faltaChavePix = forma === "pix" && momento === "agora" && !pixConfigurado;
 
+  // Fechar o popup no meio do envio apagaria o unico sinal de que o pedido
+  // esta indo: a acao continua correndo, mas o vendedor volta para a vitrine
+  // sem nada acontecendo na tela, e fecha o mesmo pedido de novo.
+  function tentarFechar() {
+    if (!fechando) aoFechar();
+  }
+
   function confirmar() {
     if (!cliente) {
       avisar.atencao("Escolha para quem é este pedido.");
@@ -75,20 +82,22 @@ export function ModalFechamento({
   return (
     <Modal
       aberto={aberto}
-      aoFechar={aoFechar}
+      aoFechar={tentarFechar}
       titulo="Fechar pedido"
       descricao={`${itens.length} ${itens.length === 1 ? "item" : "itens"}, ${moeda(total)}`}
       rodape={
         <>
-          <Botao type="button" variante="secundario" onClick={aoFechar} disabled={fechando}>
+          <Botao type="button" variante="secundario" onClick={tentarFechar} disabled={fechando}>
             Voltar
           </Botao>
-          <Botao type="button" onClick={confirmar} disabled={!cliente || fechando}>
-            {fechando
-              ? "Fechando o pedido..."
-              : avisarCliente
-                ? "Confirmar e mandar no WhatsApp"
-                : "Confirmar sem avisar"}
+          <Botao
+            type="button"
+            onClick={confirmar}
+            disabled={!cliente}
+            carregando={fechando}
+            carregandoTexto="Fechando o pedido..."
+          >
+            {avisarCliente ? "Confirmar e mandar no WhatsApp" : "Confirmar sem avisar"}
           </Botao>
         </>
       }

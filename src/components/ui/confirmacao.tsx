@@ -67,7 +67,7 @@ export function Confirmacao({
             type="submit"
             form={idDoFormulario}
             variante="secundario"
-            disabled={pendente}
+            carregando={pendente}
             carregandoTexto={carregandoTexto}
           >
             {confirmarRotulo}

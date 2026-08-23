@@ -58,7 +58,7 @@ export function ModalNovaSenha({
               type="submit"
               form={idDoFormulario}
               variante="secundario"
-              disabled={gerando}
+              carregando={gerando}
               carregandoTexto="Gerando..."
             >
               Gerar nova senha

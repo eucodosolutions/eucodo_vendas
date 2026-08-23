@@ -180,21 +180,15 @@ export function ConexaoWhatsapp({ inicial }: { inicial: Promise<Conexao> }) {
             <Botao
               type="button"
               onClick={pedirConexao}
-              disabled={ocupado}
+              carregando={ocupado}
               carregandoTexto="Gerando o código..."
             >
-              {ocupado ? (
-                <Loader2 size={16} aria-hidden className="animate-spin" />
-              ) : conexao.estado === "conectando" ? (
+              {conexao.estado === "conectando" ? (
                 <RefreshCw size={16} aria-hidden />
               ) : (
                 <MessageCircle size={16} aria-hidden />
               )}
-              {ocupado
-                ? "Gerando o código..."
-                : conexao.estado === "conectando"
-                  ? "Gerar outro código"
-                  : "Conectar o WhatsApp"}
+              {conexao.estado === "conectando" ? "Gerar outro código" : "Conectar o WhatsApp"}
             </Botao>
           )}
         </div>

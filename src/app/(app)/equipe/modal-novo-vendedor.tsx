@@ -47,7 +47,7 @@ export function ModalNovoVendedor({ aberto, aoFechar }: { aberto: boolean; aoFec
             <Botao
               type="submit"
               form={idDoFormulario}
-              disabled={pendente}
+              carregando={pendente}
               carregandoTexto="Criando acesso..."
             >
               Cadastrar vendedor

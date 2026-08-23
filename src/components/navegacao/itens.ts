@@ -45,8 +45,15 @@ const MENU: Record<PapelUsuario, ItemDeMenu[]> = {
   ],
 };
 
-/** Quantos botoes cabem na barra do celular sem virar alvo pequeno demais. */
-const CABEM_NA_BARRA = 5;
+/**
+ * Quantos botoes cabem na barra do celular sem virar alvo pequeno demais.
+ *
+ * Sao quatro, e nao cinco, porque na tela de venda o carrinho ocupa a fatia do
+ * meio: com cinco itens mais o carrinho a barra chegava a seis alvos e cada um
+ * ficava mais estreito que o dedo. Produtos, que se mexe uma vez por mes, desce
+ * para o "Mais" e deixa a barra para Vender, Pedidos e Clientes.
+ */
+const CABEM_NA_BARRA = 4;
 
 export function itensDoPapel(papel: PapelUsuario): ItemDeMenu[] {
   return MENU[papel];
