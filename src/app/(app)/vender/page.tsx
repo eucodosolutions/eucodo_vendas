@@ -4,13 +4,14 @@ import type { ClienteDaLista } from "./escolher-cliente";
 import { VendaRapida, type ProdutoDaVenda } from "./venda-rapida";
 import { LinkBotao } from "@/components/ui/link-botao";
 import { Secao } from "@/components/ui/secao";
+import { previasDaPlaca } from "@/lib/art/vitrine";
 import { detalheDaPlaca } from "@/lib/catalogo";
 import { sessaoDoPainel } from "@/lib/supabase/painel";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Venda rapida" };
 
-type ProdutoDoBanco = Omit<ProdutoDaVenda, "foto_url"> & { foto_path: string | null };
+type ProdutoDoBanco = Omit<ProdutoDaVenda, "foto_url" | "previas"> & { foto_path: string | null };
 
 export default async function PaginaVender() {
   const supabase = await createClient();
@@ -20,7 +21,7 @@ export default async function PaginaVender() {
     supabase
       .from("produtos")
       .select(
-        `id, tipo, nome, descricao, foto_path, preco_centavos, prazo_entrega_dias, ${detalheDaPlaca("largura_mm, altura_mm, cores, tecnologia")}`,
+        `id, tipo, nome, descricao, foto_path, preco_centavos, prazo_entrega_dias, ${detalheDaPlaca("largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi, cores, tecnologia")}`,
       )
       .eq("ativo", true)
       .order("ordem")
@@ -50,6 +51,11 @@ export default async function PaginaVender() {
       foto_url: produto.foto_path
         ? supabase.storage.from("produtos").getPublicUrl(produto.foto_path).data.publicUrl
         : null,
+      // A peca de exemplo e desenhada aqui, no servidor: o motor de arte usa o
+      // gerador de QR, que nao precisa ir para o navegador so para a vitrine.
+      previas: produto.produto_avaliacao
+        ? previasDaPlaca(produto, produto.produto_avaliacao)
+        : [],
     }));
 
   if (produtos.length === 0) {
