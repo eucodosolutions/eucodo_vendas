@@ -76,12 +76,12 @@ create table public.produto_avaliacao (
 
   -- O que este produto oferece na venda. Array e nao tabela: sao dois eixos de
   -- no maximo dois valores cada, e virar linha so criaria juncao para nada.
-  cores public.cor_arte[] not null
-    check (array_length(cores, 1) >= 1
-           and array_position(cores, null::public.cor_arte) is null),
+  --
+  -- O check e so de array vazio. Barrar elemento nulo dentro do array pediria
+  -- `array_position`, que e STABLE, e check aceita so expressao IMMUTABLE.
+  cores public.cor_arte[] not null check (array_length(cores, 1) >= 1),
   tecnologias public.tecnologia_arte[] not null
-    check (array_length(tecnologias, 1) >= 1
-           and array_position(tecnologias, null::public.tecnologia_arte) is null),
+    check (array_length(tecnologias, 1) >= 1),
 
   foreign key (produto_id, assinatura_id)
     references public.produtos (id, assinatura_id) on delete cascade
