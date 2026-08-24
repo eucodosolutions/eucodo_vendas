@@ -1,15 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState, useActionState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
-import { criarPedido, type EstadoVenda, type PedidoDoCarrinho } from "./actions";
+import {
+  abrirPedido,
+  cobrarEAvisar,
+  desenharArtes,
+  type PedidoAberto,
+  type PedidoDoCarrinho,
+} from "./actions";
 import { BotaoDoCarrinho } from "./botao-do-carrinho";
 import { CartaoDeProduto } from "./cartao-de-produto";
 import type { ClienteDaLista } from "./escolher-cliente";
 import { GavetaDoCarrinho } from "./gaveta-do-carrinho";
-import { ModalFechamento } from "./modal-fechamento";
+import { ModalFechamento, type ProgressoDoFechamento } from "./modal-fechamento";
 import { ModalItem } from "./modal-item";
-import { avisar, useAviso } from "@/components/ui/avisos";
+import { avisar } from "@/components/ui/avisos";
 import type { NegocioCadastrado } from "@/components/ui/busca-de-negocio";
 import type { PreviaDaArte } from "@/lib/art/vitrine";
 import { fecharCarrinho, useCarrinhoAberto } from "@/lib/carrinho/gaveta";
@@ -56,26 +63,15 @@ export function VendaRapida({
   negocios: NegocioCadastrado[];
   pixConfigurado: boolean;
 }) {
-  const [estado, fechar, fechando] = useActionState<EstadoVenda, PedidoDoCarrinho>(criarPedido, {});
-  useAviso(estado);
+  const router = useRouter();
 
-  // O botao do fechamento nao pode depender so do `fechando`.
-  //
-  // Fechar um pedido leva segundos de verdade: o servidor grava os itens,
-  // desenha a arte de cada placa, monta o PIX e ainda chama o WhatsApp. Depois
-  // disso a acao termina com `redirect`, e a navegacao ate a tela do pedido e
-  // outro tempo, ja fora da acao — o `fechando` cai ali no meio e devolve o
-  // botao inteiro, com o popup ainda aberto e nada tendo mudado na tela. Quem
-  // esta vendendo le isso como clique perdido e aperta de novo, que e pedido
-  // dobrado.
-  //
-  // O que fica guardado e o `estado` de quando o clique aconteceu, e nao um
-  // booleano: os dois desfechos possiveis se leem dele sozinhos. O erro devolve
-  // um objeto novo do `useActionState`, e o botao se solta; o sucesso nunca
-  // devolve nada, porque termina em `redirect`, entao a roda continua girando
-  // ate a tela do pedido aparecer — que e exatamente o que faltava.
-  const [estadoDoClique, setEstadoDoClique] = useState<EstadoVenda | null>(null);
-  const enviando = estadoDoClique !== null && estadoDoClique === estado;
+  // O progresso e o estado do fechamento inteiro: nulo antes do clique, e do
+  // clique em diante o passo que o servidor acabou de responder. E ele que
+  // trava o botao, e ele nunca volta a ser nulo quando da certo — a navegacao
+  // ate a tela do pedido corre depois do ultimo passo, e soltar o botao ali no
+  // meio devolveria o popup inteiro com nada tendo mudado na tela. Quem esta
+  // vendendo le isso como clique perdido e aperta de novo, que e pedido dobrado.
+  const [progresso, setProgresso] = useState<ProgressoDoFechamento | null>(null);
 
   const carrinho = useCarrinho();
 
@@ -103,6 +99,105 @@ export function VendaRapida({
   function adicionar(item: Parameters<typeof carrinho.adicionar>[0]) {
     carrinho.adicionar(item);
     avisar.sucesso("Item no carrinho.");
+  }
+
+  /**
+   * O fechamento, passo a passo, com a tela contando junto.
+   *
+   * A ordem e obrigatoria: sem pedido gravado nao ha item para desenhar, e sem
+   * os itens somados pelo gatilho o PIX sairia com o total zerado. O que muda
+   * em relacao a chamada unica de antes e que cada passo responde, e o popup
+   * mostra em qual esta porque o servidor acabou de dizer — nada aqui anda no
+   * relogio.
+   *
+   * Passado o primeiro passo, o pedido existe, e dai em diante nada mais
+   * cancela a venda. Arte que nao saiu e mensagem que nao foi viram aviso, e o
+   * vendedor cai na tela do pedido, que e onde moram os botoes de refazer as
+   * duas. Ficar preso no popup com o pedido ja gravado seria o pior desfecho:
+   * ele fecharia o mesmo pedido de novo.
+   */
+  async function fecharPedido(dados: PedidoDoCarrinho) {
+    // A conta das placas sai do carrinho, e nao da resposta do primeiro passo,
+    // so para a lista de passos ja nascer com o tamanho certo. E a mesma conta
+    // que o servidor faz — uma arte por linha, independente da quantidade —,
+    // entao a linha do desenho nao brota no meio do caminho.
+    const placasNoCarrinho = dados.itens.filter(
+      (item) => produtos.find((produto) => produto.id === item.produtoId)?.tipo === "avaliacao",
+    ).length;
+
+    setProgresso({ etapa: "gravando", placas: placasNoCarrinho, feitas: 0 });
+
+    let pedido: PedidoAberto | null = null;
+
+    try {
+      const abertura = await abrirPedido(dados);
+
+      if (!abertura.pedido) {
+        setProgresso(null);
+        avisar.erro(abertura.erro);
+        return;
+      }
+
+      pedido = abertura.pedido;
+      const { pedidoId, codigo, placas } = abertura.pedido;
+
+      // Uma placa por chamada: o contador da tela so anda quando a arte daquela
+      // linha esta gravada, entao "2 de 3" quer dizer duas placas prontas.
+      let semArte = 0;
+
+      for (const [indice, ordem] of placas.entries()) {
+        setProgresso({
+          etapa: "artes",
+          codigo,
+          placas: placas.length,
+          feitas: indice,
+        });
+
+        const arte = await desenharArtes(pedidoId, ordem);
+
+        // `total` zerado e a placa que ja tinha arquivo, e nao uma falha: o
+        // passo nao teve o que fazer. So conta como faltando o que entrou no
+        // desenho e nao saiu de la gravado.
+        if (arte.total > 0 && arte.feitas === 0) semArte += 1;
+      }
+
+      const desenhadas = { codigo, placas: placas.length, feitas: placas.length };
+
+      setProgresso({ etapa: "cobranca", ...desenhadas });
+      const { envio } = await cobrarEAvisar({
+        pedidoId,
+        avisarCliente: dados.avisarCliente,
+      });
+
+      // Sai antes de navegar, e nao na tela do pedido: la o aviso de chegada ja
+      // fala da mensagem, e a arte que faltou e outro assunto. O toast atravessa
+      // a navegacao, entao os dois chegam juntos e cada um diz a sua coisa.
+      if (semArte > 0) {
+        avisar.atencao(
+          semArte === placas.length
+            ? "O pedido está fechado, mas a arte não saiu. Use Gerar as artes na tela do pedido."
+            : `O pedido está fechado, mas ${semArte} ${semArte === 1 ? "arte não saiu" : "artes não saíram"}. Use Gerar as artes na tela do pedido.`,
+        );
+      }
+
+      setProgresso({ etapa: "abrindo", ...desenhadas });
+      router.push(`/pedidos/${pedidoId}?novo=1&envio=${envio}`);
+    } catch (erro) {
+      console.error("Falha no fechamento do pedido", erro);
+
+      // Nada gravado: o carrinho continua de pe e o botao volta para o vendedor
+      // tentar de novo, que e o unico caminho que nao perde a venda.
+      if (!pedido) {
+        setProgresso(null);
+        avisar.erro("Não consegui fechar o pedido. Confira a conexão e tente de novo.");
+        return;
+      }
+
+      avisar.atencao(
+        `Pedido ${pedido.codigo} aberto, mas o fechamento parou no meio. Confira a arte e a mensagem na tela do pedido.`,
+      );
+      router.push(`/pedidos/${pedido.pedidoId}?novo=1&envio=nao`);
+    }
   }
 
   return (
@@ -158,10 +253,9 @@ export function VendaRapida({
         itens={carrinho.itens}
         clientes={clientes}
         pixConfigurado={pixConfigurado}
-        fechando={fechando || enviando}
+        progresso={progresso}
         aoConfirmar={({ cliente, forma, momento, avisarCliente, observacoes }) => {
-          setEstadoDoClique(estado);
-          fechar({
+          void fecharPedido({
             clienteId: cliente.id,
             forma,
             momento,

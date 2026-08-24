@@ -3,12 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { renderPreviewPng, renderPrintJpg } from "@/lib/art/render";
-import { specDoProduto } from "@/lib/art/spec";
-import { detalheDaPlaca } from "@/lib/catalogo";
+import { gerarArtesDoPedido } from "@/lib/art/pedido";
 import { createClient } from "@/lib/supabase/server";
 import { chaveDoFechamento, enviarWhatsapp, type ChaveMensagem } from "@/lib/whatsapp/enviar";
-import type { FormaPagamento, PedidoItem, StatusPedido } from "@/types/database";
+import type { FormaPagamento, StatusPedido } from "@/types/database";
 
 export type EstadoAcao = {
   erro?: string;
@@ -263,119 +261,42 @@ function mensagemDeEnvio(
 }
 
 /**
- * Refaz os arquivos de arte do pedido, item por item.
+ * Refaz os arquivos de arte do pedido.
  *
  * Serve quando a geracao falhou na hora da venda, e quando o pedido tem varias
- * placas e so uma delas ficou sem arquivo. Cada item tem a propria arte, entao
- * cada item e regerado com os dados que ficaram guardados nele.
+ * placas e so uma delas ficou sem arquivo. Refaz todas, e nao so as que
+ * faltam: o arquivo e sobrescrito, e uma arte que saiu torta por causa de um
+ * cadastro errado nao teria como ser trocada se o botao pulasse o que ja existe.
+ *
+ * O laco em si mora em `lib/art/pedido`, junto com o passo de arte do
+ * fechamento. Eram duas copias que ja tinham divergido no jeito de percorrer as
+ * placas.
  */
-type ProdutoParaArte = {
-  id: string;
-  nome: string;
-  produto_avaliacao: {
-    largura_mm: number;
-    altura_mm: number;
-    margem_seguranca_mm: number;
-    sangria_mm: number;
-    dpi: number;
-  } | null;
-};
-
 export async function regerarArte(_estado: EstadoAcao, dados: FormData): Promise<EstadoAcao> {
   const pedidoId = z.string().uuid().safeParse(dados.get("pedidoId"));
   if (!pedidoId.success) return { erro: "Pedido inválido." };
 
-  const { supabase, user } = await sessao();
+  const { user } = await sessao();
   if (!user) return { erro: "Sessão expirada. Entre de novo." };
 
-  const { data: pedido } = await supabase
-    .from("pedidos")
-    .select("id, codigo, assinatura_id, pedido_itens (*)")
-    .eq("id", pedidoId.data)
-    .single<{ id: string; codigo: string; assinatura_id: string; pedido_itens: PedidoItem[] }>();
+  const { total, feitas, erro } = await gerarArtesDoPedido(pedidoId.data, { refazer: true });
 
-  if (!pedido) return { erro: "Pedido não encontrado." };
+  if (erro) return { erro };
+  if (total === 0) return { erro: "Este pedido não tem nenhuma placa para gerar arte." };
 
-  // Produto padrao nao tem arte: sobra so o que foi vendido como placa.
-  const placas = pedido.pedido_itens.filter((item) => item.tipo === "avaliacao");
+  revalidatePath(`/pedidos/${pedidoId.data}`);
 
-  if (placas.length === 0) {
-    return { erro: "Este pedido não tem nenhuma placa para gerar arte." };
-  }
-
-  const ids = [...new Set(placas.map((item) => item.produto_id))];
-
-  const { data: produtos } = await supabase
-    .from("produtos")
-    .select(
-      `id, nome, ${detalheDaPlaca("largura_mm, altura_mm, margem_seguranca_mm, sangria_mm, dpi")}`,
-    )
-    .in("id", ids)
-    .returns<ProdutoParaArte[]>();
-
-  const porId = new Map(
-    (produtos ?? [])
-      .filter((produto) => produto.produto_avaliacao !== null)
-      .map((produto) => [produto.id, produto]),
-  );
-
-  const faltando = placas.find((item) => !porId.has(item.produto_id));
-  if (faltando) {
-    return { erro: `O produto ${faltando.produto_nome} não existe mais no seu catálogo.` };
-  }
-
-  let refeitos = 0;
-
-  for (const item of placas) {
-    try {
-      const produto = porId.get(item.produto_id)!;
-      const arte = {
-        spec: specDoProduto(produto, produto.produto_avaliacao!),
-        color: item.cor!,
-        tech: item.tecnologia!,
-        businessName: item.nome_negocio!,
-        reviewUrl: item.link_avaliacao!,
-      };
-
-      const [jpg, previa] = await Promise.all([renderPrintJpg(arte), renderPreviewPng(arte)]);
-      const base = `${pedido.assinatura_id}/${pedido.codigo}/${item.ordem}`;
-
-      await supabase.storage
-        .from("artes")
-        .upload(`${base}/arte.jpg`, jpg, { contentType: "image/jpeg", upsert: true });
-      await supabase.storage
-        .from("artes")
-        .upload(`${base}/previa.png`, previa, { contentType: "image/png", upsert: true });
-
-      await supabase
-        .from("pedido_itens")
-        .update({
-          arte_jpg_path: `${base}/arte.jpg`,
-          arte_preview_path: `${base}/previa.png`,
-        })
-        .eq("id", item.id);
-
-      refeitos += 1;
-    } catch (erro) {
-      console.error("Falha ao regerar arte", pedido.codigo, item.ordem, erro);
-    }
-  }
-
-  revalidatePath(`/pedidos/${pedido.id}`);
-
-  if (refeitos === 0) {
+  if (feitas === 0) {
     return { erro: "A geração da arte falhou. Confira os links de avaliação dos itens." };
   }
 
-  if (refeitos < placas.length) {
+  if (feitas < total) {
     return {
-      sucesso: `${refeitos} de ${placas.length} artes foram geradas. Confira o link das que faltaram.`,
+      sucesso: `${feitas} de ${total} artes foram geradas. Confira o link das que faltaram.`,
     };
   }
 
-  return {
-    sucesso: refeitos === 1 ? "Arte gerada de novo." : `${refeitos} artes geradas de novo.`,
-  };
+  return { sucesso: feitas === 1 ? "Arte gerada de novo." : `${feitas} artes geradas de novo.` };
 }
 
 async function registrarEvento({

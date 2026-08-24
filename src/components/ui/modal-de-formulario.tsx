@@ -34,6 +34,13 @@ type ModalDeFormularioProps = {
  * Os botoes ficam fora do `<form>` para nao rolarem com o conteudo, e se ligam
  * a ele pelo atributo `form`. Por isso o `pendente` vem de fora: `useFormStatus`
  * so enxerga botao que esteja dentro da arvore do formulario.
+ *
+ * E por isso que ele entra como `carregando`, e nao so como `disabled`. Preso
+ * ao `disabled`, o Salvar apenas desbotava: sem roda e sem "Salvando...",
+ * porque o `Botao` so mostra os dois quando sabe que a acao esta correndo. Num
+ * cadastro que leva um segundo isso passa; no cliente que nasce no meio do
+ * fechamento do pedido, com o comprador na frente, o botao apagado se le como
+ * clique perdido.
  */
 export function ModalDeFormulario({
   aberto,
@@ -70,7 +77,7 @@ export function ModalDeFormulario({
           <Botao
             type="submit"
             form={idDoFormulario}
-            disabled={pendente}
+            carregando={pendente}
             carregandoTexto={carregandoTexto}
           >
             {salvarRotulo}
