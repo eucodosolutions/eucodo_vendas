@@ -61,16 +61,23 @@ no valor: cobrar diferente por NFC e cadastrar dois produtos.
 ## Painel
 
 - Navegacao: barra lateral no desktop, barra inferior no celular, menu por papel.
-- Lista de pedidos, com cliente e resumo dos itens.
+- Pedidos em quadro por status, com arrastar e soltar no desktop; no celular,
+  a mesma lista com abas de status e o botao de avancar no cartao. A lista
+  cronologica continua disponivel em `?vista=lista`.
 - Detalhe do pedido: dados, preview da arte, download do JPG em alta (300 DPI)
   e do PDF com sangria para grafica.
-- Mudanca de status notifica o cliente no WhatsApp (mensagem por status, editavel).
+- Mudanca de status notifica o cliente no WhatsApp (mensagem por status, editavel),
+  com confirmacao antes e opcao de nao avisar.
 - Cancelar pedido (com motivo) e marcar como pago (forma + data).
 - Log de eventos e de mensagens enviadas por pedido.
 
 ## Status do pedido
 
 `novo` -> `em_producao` -> `pronto` -> `entregue`, e `cancelado` a partir de qualquer um.
+Da para pular etapa (venda entregue na hora) e para voltar (conserto de engano);
+o que nao anda mais e pedido cancelado. As regras moram em `lib/pedidos/fluxo.ts`
+e a action confere antes de gravar.
+Voltar nao avisa o cliente por padrao, e todo movimento tem interruptor de aviso.
 Pagamento em trilha separada: `pendente` / `pago`, com forma (pix, dinheiro, cartao, transferencia).
 
 ## Modelo de dados

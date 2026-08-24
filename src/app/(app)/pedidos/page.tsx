@@ -1,33 +1,21 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
-import { EtiquetaPagamento, EtiquetaStatus } from "@/components/etiquetas";
+import { AlternadorDeVista, type Vista } from "./alternador-de-vista";
+import { COLUNAS_DA_LINHA, type LinhaPedido } from "./linha";
+import { PedidosInterativos } from "./pedidos-interativos";
 import { CabecalhoDePagina } from "@/components/ui/cabecalho-de-pagina";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { LinkBotao } from "@/components/ui/link-botao";
-import { dataHora, moeda, whatsappLegivel } from "@/lib/formato";
+import { moeda } from "@/lib/formato";
 import { sessaoDoPainel } from "@/lib/supabase/painel";
 import { createClient } from "@/lib/supabase/server";
-import type { Cliente, Pedido, PedidoItem } from "@/types/database";
 
 export const metadata: Metadata = { title: "Pedidos" };
 
-type LinhaPedido = Pick<
-  Pedido,
-  | "id"
-  | "codigo"
-  | "total_centavos"
-  | "status"
-  | "pagamento"
-  | "comissao_centavos"
-  | "comissao_paga_em"
-  | "criado_em"
-> & {
-  clientes: Pick<Cliente, "nome" | "whatsapp"> | null;
-  pedido_itens: Array<Pick<PedidoItem, "nome_negocio" | "produto_nome" | "quantidade">>;
-};
+export default async function PaginaPedidos({ searchParams }: PageProps<"/pedidos">) {
+  const { vista: escolhida } = await searchParams;
+  const vista: Vista = escolhida === "lista" ? "lista" : "quadro";
 
-export default async function PaginaPedidos() {
   const supabase = await createClient();
   const sessao = await sessaoDoPainel();
 
@@ -36,13 +24,15 @@ export default async function PaginaPedidos() {
   // vendedor quer saber quanto ele tem a receber.
   const ehVendedor = sessao?.perfil.papel === "vendedor";
 
+  // O quadro divide o mesmo bolo em cinco colunas, entao o teto de antes deixava
+  // as ultimas quase vazias numa conta movimentada. As colunas de entregue e
+  // cancelado ainda cortam o que mostram; quem precisa do historico inteiro vai
+  // para a lista.
   const { data } = await supabase
     .from("pedidos")
-    .select(
-      "id, codigo, total_centavos, status, pagamento, comissao_centavos, comissao_paga_em, criado_em, clientes (nome, whatsapp), pedido_itens (nome_negocio, produto_nome, quantidade)",
-    )
+    .select(COLUNAS_DA_LINHA)
     .order("criado_em", { ascending: false })
-    .limit(100)
+    .limit(200)
     .returns<LinhaPedido[]>();
 
   const pedidos = data ?? [];
@@ -65,7 +55,12 @@ export default async function PaginaPedidos() {
             ? "Nenhum pedido ainda."
             : `${pedidos.length} pedido${pedidos.length > 1 ? "s" : ""}, ${moeda(aReceber)} ${ehVendedor ? "de comissão " : ""}a receber.`
         }
-        acao={<LinkBotao href="/vender">Novo pedido</LinkBotao>}
+        acao={
+          <div className="flex items-center gap-2">
+            {pedidos.length > 0 ? <AlternadorDeVista vista={vista} /> : null}
+            <LinkBotao href="/vender">Novo pedido</LinkBotao>
+          </div>
+        }
       />
 
       {pedidos.length === 0 ? (
@@ -74,73 +69,8 @@ export default async function PaginaPedidos() {
           acao={<LinkBotao href="/vender">Fechar a primeira venda</LinkBotao>}
         />
       ) : (
-        <ul className="flex flex-col gap-3">
-          {pedidos.map((pedido) => (
-            <li key={pedido.id}>
-              <Link
-                href={`/pedidos/${pedido.id}`}
-                className="flex flex-col gap-3 rounded-card border border-borda bg-superficie p-4 transition-colors hover:border-borda-forte sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-xs font-medium text-tinta-suave">
-                      {pedido.codigo}
-                    </span>
-                    <EtiquetaStatus status={pedido.status} />
-                    <EtiquetaPagamento pagamento={pedido.pagamento} />
-                  </div>
-
-                  <p className="mt-1 truncate text-base font-medium text-tinta">
-                    {pedido.clientes?.nome ?? "Cliente removido"}
-                  </p>
-
-                  <p className="text-sm text-tinta-suave">
-                    {resumirItens(pedido.pedido_itens)}
-                    {pedido.clientes ? ` | ${whatsappLegivel(pedido.clientes.whatsapp)}` : ""}
-                  </p>
-                </div>
-
-                <div className="shrink-0 text-left sm:text-right">
-                  <p className="text-lg font-semibold text-tinta tabular-nums">
-                    {moeda(pedido.total_centavos)}
-                  </p>
-                  {ehVendedor && pedido.comissao_centavos > 0 ? (
-                    <p className="text-xs font-medium text-sucesso tabular-nums">
-                      {moeda(pedido.comissao_centavos)} de comissão
-                      {pedido.comissao_paga_em ? ", já acertada" : ""}
-                    </p>
-                  ) : null}
-                  <p className="text-xs text-tinta-suave tabular-nums">
-                    {dataHora(pedido.criado_em)}
-                  </p>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <PedidosInterativos pedidos={pedidos} vista={vista} ehVendedor={ehVendedor} />
       )}
     </div>
   );
-}
-
-/**
- * Uma linha para o pedido inteiro.
- *
- * Com um item so, o que interessa e de qual negocio e a placa — e, quando nao e
- * placa, o nome do produto. Com varios, a lista nao caberia e vale a contagem.
- */
-function resumirItens(
-  itens: Array<Pick<PedidoItem, "nome_negocio" | "produto_nome" | "quantidade">>,
-): string {
-  if (itens.length === 0) return "Sem itens";
-
-  const pecas = itens.reduce((soma, item) => soma + item.quantidade, 0);
-
-  if (itens.length === 1) {
-    const item = itens[0];
-    const nome = item.nome_negocio || item.produto_nome;
-    return item.quantidade > 1 ? `${nome}, ${item.quantidade} unidades` : nome;
-  }
-
-  return `${itens.length} itens, ${pecas} peças`;
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { gerarArtesDoPedido } from "@/lib/art/pedido";
+import { podeMover } from "@/lib/pedidos/fluxo";
 import { createClient } from "@/lib/supabase/server";
 import { chaveDoFechamento, enviarWhatsapp, type ChaveMensagem } from "@/lib/whatsapp/enviar";
 import type { FormaPagamento, StatusPedido } from "@/types/database";
@@ -28,6 +29,11 @@ const STATUS_VALIDOS = ["novo", "em_producao", "pronto", "entregue"] as const;
 const esquemaStatus = z.object({
   pedidoId: z.string().uuid(),
   status: z.enum(STATUS_VALIDOS),
+  // Nem toda mudanca de status e novidade para o cliente. Desfazer um engano no
+  // quadro nao merece mensagem, e o pedido que andou enquanto o vendedor estava
+  // com o cliente na frente ja foi avisado de viva voz. O padrao continua sendo
+  // avisar: quem chama sem dizer nada quer a mensagem.
+  avisar: z.enum(["sim", "nao"]).default("sim"),
 });
 
 const esquemaPagamento = z.object({
@@ -53,6 +59,7 @@ export async function mudarStatus(_estado: EstadoAcao, dados: FormData): Promise
   const resultado = esquemaStatus.safeParse({
     pedidoId: dados.get("pedidoId"),
     status: dados.get("status"),
+    avisar: dados.get("avisar") ?? undefined,
   });
   if (!resultado.success) return { erro: "Status inválido." };
 
@@ -63,11 +70,20 @@ export async function mudarStatus(_estado: EstadoAcao, dados: FormData): Promise
     .from("pedidos")
     .select("status")
     .eq("id", resultado.data.pedidoId)
-    .single();
+    .single<{ status: StatusPedido }>();
 
   if (!pedido) return { erro: "Pedido não encontrado." };
   if (pedido.status === "cancelado") {
     return { erro: "Pedido cancelado não muda de status." };
+  }
+  if (pedido.status === resultado.data.status) {
+    return { erro: `Este pedido já está ${rotulo(resultado.data.status)}.` };
+  }
+  // A regra sempre existiu, mas so no cliente. Enquanto mudar status era apertar
+  // um botao que ja vinha com o destino certo, ninguem notava; o quadro deixa a
+  // pessoa escolher a coluna, entao a conferencia precisa morar deste lado.
+  if (!podeMover(pedido.status, resultado.data.status)) {
+    return { erro: "Esse pedido não pode ir para lá." };
   }
 
   const { error } = await supabase
@@ -77,23 +93,29 @@ export async function mudarStatus(_estado: EstadoAcao, dados: FormData): Promise
 
   if (error) return { erro: "Não consegui mudar o status." };
 
+  const avisar = resultado.data.avisar === "sim";
+
   await registrarEvento({
     supabase,
     pedidoId: resultado.data.pedidoId,
     tipo: "status",
     de: pedido.status,
     para: resultado.data.status,
+    detalhe: avisar ? undefined : "cliente nao avisado",
     autorId: user.id,
   });
 
   const chave = MENSAGEM_DO_STATUS[resultado.data.status];
-  const envio = chave ? await enviarWhatsapp(resultado.data.pedidoId, chave) : null;
+  const envio = chave && avisar ? await enviarWhatsapp(resultado.data.pedidoId, chave) : null;
 
   revalidatePath(`/pedidos/${resultado.data.pedidoId}`);
   revalidatePath("/pedidos");
 
   return {
-    sucesso: mensagemDeEnvio(`Status alterado para ${rotulo(resultado.data.status)}.`, envio),
+    sucesso: mensagemDeEnvio(
+      `Status alterado para ${rotulo(resultado.data.status)}.${avisar ? "" : " Cliente não avisado."}`,
+      envio,
+    ),
     link: envio?.enviado === false ? envio.link : undefined,
   };
 }

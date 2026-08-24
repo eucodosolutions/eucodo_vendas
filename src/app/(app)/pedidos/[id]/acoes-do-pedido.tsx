@@ -2,31 +2,15 @@
 
 import { useActionState, useState } from "react";
 
-import {
-  cancelarPedido,
-  marcarPago,
-  mudarStatus,
-  reenviarMensagem,
-  regerarArte,
-  type EstadoAcao,
-} from "./acoes";
+import { marcarPago, mudarStatus, reenviarMensagem, regerarArte, type EstadoAcao } from "./acoes";
+import { ConfirmacaoDeCancelamento } from "../confirmacao-de-cancelamento";
 import { useAviso } from "@/components/ui/avisos";
 import { Botao } from "@/components/ui/botao";
-import { Campo } from "@/components/ui/campo";
-import { Confirmacao } from "@/components/ui/confirmacao";
-import { Interruptor } from "@/components/ui/interruptor";
 import { Secao } from "@/components/ui/secao";
 import { Selecao } from "@/components/ui/selecao";
 import { ROTULO_PAGAMENTO, ROTULO_STATUS } from "@/lib/formato";
+import { PROXIMO_STATUS } from "@/lib/pedidos/fluxo";
 import type { FormaPagamento, StatusPagamento, StatusPedido } from "@/types/database";
-
-const PROXIMO_STATUS: Record<StatusPedido, StatusPedido[]> = {
-  novo: ["em_producao"],
-  em_producao: ["pronto"],
-  pronto: ["entregue"],
-  entregue: [],
-  cancelado: [],
-};
 
 const FORMAS: FormaPagamento[] = [
   "pix",
@@ -50,10 +34,6 @@ export function AcoesDoPedido({
 }) {
   const [estadoStatus, acaoStatus] = useActionState<EstadoAcao, FormData>(mudarStatus, {});
   const [estadoPagamento, acaoPagamento] = useActionState<EstadoAcao, FormData>(marcarPago, {});
-  const [estadoCancelar, acaoCancelar, cancelando] = useActionState<EstadoAcao, FormData>(
-    cancelarPedido,
-    {},
-  );
   const [estadoArte, acaoArte] = useActionState<EstadoAcao, FormData>(regerarArte, {});
   const [estadoEnvio, acaoEnvio] = useActionState<EstadoAcao, FormData>(reenviarMensagem, {});
 
@@ -66,7 +46,6 @@ export function AcoesDoPedido({
   useAviso(estadoEnvio);
 
   const [mostrarCancelamento, setMostrarCancelamento] = useState(false);
-  const [avisarCliente, setAvisarCliente] = useState(true);
   const cancelado = status === "cancelado";
 
   if (cancelado) {
@@ -131,56 +110,22 @@ export function AcoesDoPedido({
 
         <button
           type="button"
-          onClick={() => {
-            setAvisarCliente(true);
-            setMostrarCancelamento(true);
-          }}
+          onClick={() => setMostrarCancelamento(true)}
           className="self-start text-sm font-medium text-erro hover:underline"
         >
           Cancelar pedido
         </button>
       </div>
 
-      <Confirmacao
-        aberto={mostrarCancelamento}
-        aoFechar={() => setMostrarCancelamento(false)}
-        titulo="Cancelar este pedido?"
-        mensagem="O pedido para de andar: não dá mais para mudar status nem baixar pagamento. O motivo fica no histórico."
-        acao={acaoCancelar}
-        estado={estadoCancelar}
-        pendente={cancelando}
-        confirmarRotulo="Confirmar cancelamento"
-        carregandoTexto="Cancelando..."
-        ocultos={{ pedidoId, avisar: avisarCliente ? "sim" : "nao" }}
-      >
-        <Campo
-          rotulo="Por que este pedido está sendo cancelado?"
-          name="motivo"
-          required
-          minLength={3}
-          placeholder="Cliente desistiu, dado errado, pagamento não veio"
+      {/* Montada so quando abre, para o motivo e o interruptor comecarem
+          limpos a cada vez. O formulario mora fora daqui porque o quadro de
+          pedidos abre o mesmo cancelamento ao soltar um cartao na coluna. */}
+      {mostrarCancelamento ? (
+        <ConfirmacaoDeCancelamento
+          pedidoId={pedidoId}
+          aoFechar={() => setMostrarCancelamento(false)}
         />
-
-        {/* O motivo e sempre obrigatorio porque fica no historico; o aviso e
-            escolha do vendedor. Cancelamento combinado na conversa nao precisa
-            de mensagem, e pedido que o cliente nem sabe que existia menos
-            ainda. */}
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-borda bg-papel p-3">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-tinta">Avisar o cliente no WhatsApp</p>
-            <p className="mt-0.5 text-sm text-tinta-suave">
-              {avisarCliente
-                ? "Ele recebe a mensagem de pedido cancelado. O motivo não vai junto."
-                : "O pedido é cancelado calado, sem mensagem nenhuma."}
-            </p>
-          </div>
-          <Interruptor
-            ligado={avisarCliente}
-            rotulo="Avisar o cliente no WhatsApp"
-            onChange={setAvisarCliente}
-          />
-        </div>
-      </Confirmacao>
+      ) : null}
     </Secao>
   );
 }
