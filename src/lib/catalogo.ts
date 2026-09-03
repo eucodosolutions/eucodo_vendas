@@ -28,12 +28,13 @@ export function ehAvaliacao(tipo: TipoProduto): boolean {
  * Os tamanhos que a Eucodo corta, com as medidas do acrilico que ela usa.
  *
  * Quem escolhe A6 ou A5 nao digita medida nenhuma: o cadastro copia daqui. Sao
- * as medidas da placa, e nao as do papel — por isso 107x150 e nao 105x148.
+ * as medidas da placa que sai da serra, e nao as da folha A6 — por isso 103x153
+ * e nao 105x148.
  */
 export type TamanhoDePlaca = "a6" | "a5" | "personalizado";
 
 export const TAMANHOS = {
-  a6: { rotulo: "A6", largura_mm: 107, altura_mm: 150 },
+  a6: { rotulo: "A6", largura_mm: 103, altura_mm: 153 },
   a5: { rotulo: "A5", largura_mm: 150, altura_mm: 212 },
 } as const satisfies Record<string, { rotulo: string; largura_mm: number; altura_mm: number }>;
 
