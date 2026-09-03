@@ -30,7 +30,8 @@ export type NegocioCadastrado = {
 const MINIMO_DE_BUSCA = 3;
 const CABEM_NA_LISTA = 6;
 
-type Modo = "cadastrados" | "busca" | "link";
+/** Por qual dos tres caminhos o link esta entrando agora. */
+export type ModoDeBusca = "cadastrados" | "busca" | "link";
 
 /**
  * Como o link de avaliacao entra no sistema.
@@ -59,6 +60,8 @@ export function BuscaDeNegocio({
   escolhido,
   aoEscolher,
   cadastrados,
+  linkAtual,
+  aoTrocarModo,
 }: {
   escolhido: NegocioEscolhido | null;
   aoEscolher: (negocio: NegocioEscolhido | null) => void;
@@ -67,10 +70,22 @@ export function BuscaDeNegocio({
    * existe justamente para criar o que ainda nao esta nela.
    */
   cadastrados?: NegocioCadastrado[];
+  /**
+   * O link que a tela ja tem em maos, para a aba de colar abrir com ele dentro.
+   * Sem isto, quem digitou o link em outro campo e depois abriu esta aba veria
+   * uma caixa vazia enquanto o link antigo continua valendo.
+   */
+  linkAtual?: string;
+  /**
+   * Avisa a tela em qual aba a pessoa esta. Serve a quem tem campo proprio de
+   * link: com a aba de colar aberta, o campo de fora seria o mesmo campo duas
+   * vezes, um deles sempre desatualizado.
+   */
+  aoTrocarModo?: (modo: ModoDeBusca) => void;
 }) {
   const temAgenda = Boolean(cadastrados && cadastrados.length > 0);
 
-  const [modo, setModo] = useState<Modo>(temAgenda ? "cadastrados" : "busca");
+  const [modo, setModo] = useState<ModoDeBusca>(temAgenda ? "cadastrados" : "busca");
   const [termo, setTermo] = useState("");
   const [resultados, setResultados] = useState<NegocioEncontrado[]>([]);
   const [buscando, setBuscando] = useState(false);
@@ -79,6 +94,11 @@ export function BuscaDeNegocio({
 
   const rotuloId = useId();
   const curto = termo.trim().length < MINIMO_DE_BUSCA;
+
+  function trocarModo(novo: ModoDeBusca) {
+    setModo(novo);
+    aoTrocarModo?.(novo);
+  }
 
   async function pesquisar() {
     const procurado = termo.trim();
@@ -110,7 +130,7 @@ export function BuscaDeNegocio({
     setResultados([]);
     setErro(null);
     setJaBuscou(false);
-    setModo(temAgenda ? "cadastrados" : "busca");
+    trocarModo(temAgenda ? "cadastrados" : "busca");
   }
 
   return (
@@ -163,15 +183,15 @@ export function BuscaDeNegocio({
         <>
           <div className="flex gap-4 border-b border-borda">
             {temAgenda ? (
-              <Aba ativa={modo === "cadastrados"} aoTocar={() => setModo("cadastrados")}>
+              <Aba ativa={modo === "cadastrados"} aoTocar={() => trocarModo("cadastrados")}>
                 Meus negócios
               </Aba>
             ) : null}
-            <Aba ativa={modo === "busca"} aoTocar={() => setModo("busca")}>
+            <Aba ativa={modo === "busca"} aoTocar={() => trocarModo("busca")}>
               {/* Com tres abas os rotulos longos nao cabem num celular. */}
               {temAgenda ? "Pesquisar" : "Pesquisar no Google"}
             </Aba>
-            <Aba ativa={modo === "link"} aoTocar={() => setModo("link")}>
+            <Aba ativa={modo === "link"} aoTocar={() => trocarModo("link")}>
               {temAgenda ? "Tenho o link" : "Já tenho o link"}
             </Aba>
           </div>
@@ -267,7 +287,10 @@ export function BuscaDeNegocio({
           ) : null}
 
           {modo === "link" ? (
-            <ColarLink aoColar={(link) => aoEscolher({ nome: "", linkAvaliacao: link })} />
+            <ColarLink
+              inicial={linkAtual ?? ""}
+              aoColar={(link) => aoEscolher({ nome: "", linkAvaliacao: link })}
+            />
           ) : null}
         </>
       )}
@@ -436,8 +459,10 @@ function Aba({
  * problema antigo: o link e do Google, abre normalmente, e leva para a ficha do
  * negocio em vez do formulario de avaliacao.
  */
-function ColarLink({ aoColar }: { aoColar: (link: string) => void }) {
-  const [texto, setTexto] = useState("");
+function ColarLink({ inicial, aoColar }: { inicial: string; aoColar: (link: string) => void }) {
+  // A aba so existe na tela enquanto esta aberta, entao o estado nasce de novo
+  // a cada visita — e nasce com o link que a tela ja tinha.
+  const [texto, setTexto] = useState(inicial);
   const [erro, setErro] = useState<string | null>(null);
 
   function confirmar() {
