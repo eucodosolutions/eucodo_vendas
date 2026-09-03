@@ -63,6 +63,9 @@ export function GeradorDeArte({
 
   const [modeloId, setModeloId] = useState(primeiro?.id ?? "");
   const [negocio, setNegocio] = useState<NegocioEscolhido | null>(null);
+  // A aba de colar o link ja e o campo de link: enquanto ela esta aberta, o
+  // campo de baixo some. Comeca falso porque a busca nunca abre nessa aba.
+  const [colandoLink, setColandoLink] = useState(false);
   const [nome, setNome] = useState("");
   const [link, setLink] = useState("");
   const [cor, setCor] = useState<CorArte>(primeiro?.produto_avaliacao.cores[0] ?? "branco");
@@ -192,6 +195,8 @@ export function GeradorDeArte({
               escolhido={negocio}
               aoEscolher={escolherNegocio}
               cadastrados={negocios}
+              linkAtual={link}
+              aoTrocarModo={(modo) => setColandoLink(modo === "link")}
             />
 
             <Campo
@@ -203,13 +208,18 @@ export function GeradorDeArte({
               ajuda="É este nome que vai impresso, no lugar do logo do Google."
             />
 
-            <Campo
-              rotulo="Link de avaliação"
-              placeholder="https://g.page/r/.../review"
-              autoComplete="off"
-              value={link}
-              onChange={(evento) => digitarLink(evento.target.value)}
-            />
+            {/* Some so enquanto a aba de colar esta aberta e sem nada resolvido.
+                Com o negocio escolhido a aba sai da tela, e o campo volta a ser
+                onde se confere para onde o QR aponta. */}
+            {colandoLink && !negocio ? null : (
+              <Campo
+                rotulo="Link de avaliação"
+                placeholder="https://g.page/r/.../review"
+                autoComplete="off"
+                value={link}
+                onChange={(evento) => digitarLink(evento.target.value)}
+              />
+            )}
 
             <Cores cor={cor} aoTrocar={setCor} />
           </div>
